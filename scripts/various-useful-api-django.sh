@@ -41,14 +41,40 @@ APP_NAME="various-useful-api-django"
 SERVICE_NAME="various-useful-apis"
 SOCKET_PATH="/run/gunicorn_various_useful_apis.sock"
 PYTHON_VERSION="python3"
-CURRENT_USER=$(whoami)
-HOME_DIR=$(eval echo ~$CURRENT_USER)
-INSTALL_DIR="$HOME_DIR/$APP_NAME"
-VENV_DIR="$INSTALL_DIR/venv"
+INSTALLER_USER="installer_user"
+
+# These will be set after user setup
+CURRENT_USER=""
+HOME_DIR=""
+INSTALL_DIR=""
+VENV_DIR=""
 
 #-------------------------------------------------------------------------------
 # Helper functions
 #-------------------------------------------------------------------------------
+
+show_usage() {
+    echo "Usage: $0 <domain_name>"
+    echo ""
+    echo "Arguments:"
+    echo "  domain_name    The domain name for the application (e.g., api.example.com)"
+    echo ""
+    echo "Example:"
+    echo "  $0 api.example.com"
+    echo ""
+    echo "Note: This script must be run as root or with sudo."
+    exit 1
+}
+
+validate_domain() {
+    local domain="$1"
+    # Basic domain validation regex
+    if [[ ! "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
+        print_error "Invalid domain format: $domain"
+        print_info "Please enter a valid domain (e.g., api.example.com)"
+        exit 1
+    fi
+}
 
 print_header() {
     echo ""
@@ -89,11 +115,39 @@ generate_secret_key() {
 }
 
 check_root() {
-    if [[ $EUID -eq 0 ]]; then
-        print_error "This script should not be run as root!"
-        print_info "Run as a regular user with sudo privileges."
+    if [[ $EUID -ne 0 ]]; then
+        print_error "This script must be run as root!"
+        print_info "Run with: sudo $0 <domain_name>"
         exit 1
     fi
+}
+
+setup_installer_user() {
+    print_header "Setting Up Installer User"
+
+    # Check if installer_user already exists
+    if id "$INSTALLER_USER" &>/dev/null; then
+        print_info "User '$INSTALLER_USER' already exists"
+    else
+        print_step "Creating user '$INSTALLER_USER'..."
+        useradd -m -s /bin/bash "$INSTALLER_USER"
+        print_success "User '$INSTALLER_USER' created"
+    fi
+
+    # Add user to sudo group for necessary operations
+    print_step "Adding '$INSTALLER_USER' to sudo group..."
+    usermod -aG sudo "$INSTALLER_USER"
+    print_success "User added to sudo group"
+
+    # Set up variables for the installer user
+    CURRENT_USER="$INSTALLER_USER"
+    HOME_DIR=$(eval echo ~$INSTALLER_USER)
+    INSTALL_DIR="$HOME_DIR/$APP_NAME"
+    VENV_DIR="$INSTALL_DIR/venv"
+
+    print_success "Installer user configured: $INSTALLER_USER"
+    print_info "Home directory: $HOME_DIR"
+    print_info "Installation directory: $INSTALL_DIR"
 }
 
 check_ubuntu() {
@@ -124,69 +178,52 @@ show_banner() {
     echo ""
 }
 
-get_domain_name() {
+parse_arguments() {
+    # Check if domain name argument is provided
+    if [[ $# -lt 1 ]] || [[ -z "$1" ]]; then
+        print_error "Domain name is required!"
+        show_usage
+    fi
+
+    DOMAIN_NAME="$1"
+    validate_domain "$DOMAIN_NAME"
+
     print_header "Domain Configuration"
-
-    while true; do
-        echo -e "${WHITE}Please enter your domain name (e.g., api.example.com):${NC}"
-        echo -n -e "${CYAN}➜ ${NC}"
-        read -r DOMAIN_NAME
-
-        # Validate domain name format
-        if [[ -z "$DOMAIN_NAME" ]]; then
-            print_error "Domain name cannot be empty. Please try again."
-            continue
-        fi
-
-        # Basic domain validation regex
-        if [[ ! "$DOMAIN_NAME" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
-            print_error "Invalid domain format. Please enter a valid domain (e.g., api.example.com)"
-            continue
-        fi
-
-        echo ""
-        print_info "Domain name: ${BOLD}$DOMAIN_NAME${NC}"
-        echo -e "${WHITE}Is this correct? (y/n):${NC} "
-        read -r confirm
-
-        if [[ "$confirm" =~ ^[Yy]$ ]]; then
-            break
-        fi
-    done
-
     print_success "Domain configured: $DOMAIN_NAME"
 }
 
 install_dependencies() {
     print_header "Installing System Dependencies"
 
+    # Set non-interactive mode for all package installations
+    export DEBIAN_FRONTEND=noninteractive
+
     print_step "Updating package lists..."
-    sudo apt-get update -qq
+    apt-get update -qq
     print_success "Package lists updated"
 
     print_step "Installing Git..."
-    sudo apt-get install -y -qq git > /dev/null 2>&1
+    apt-get install -y -qq git > /dev/null 2>&1
     print_success "Git installed"
 
     print_step "Installing Python 3 and development tools..."
-    sudo apt-get install -y -qq python3 python3-pip python3-venv python3-dev > /dev/null 2>&1
+    apt-get install -y -qq python3 python3-pip python3-venv python3-dev > /dev/null 2>&1
     print_success "Python 3 installed"
 
     print_step "Installing MySQL Server..."
-    # Set non-interactive mode for MySQL installation
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mysql-server libmysqlclient-dev pkg-config > /dev/null 2>&1
+    apt-get install -y -qq mysql-server libmysqlclient-dev pkg-config > /dev/null 2>&1
     print_success "MySQL Server installed"
 
     print_step "Installing Nginx..."
-    sudo apt-get install -y -qq nginx > /dev/null 2>&1
+    apt-get install -y -qq nginx > /dev/null 2>&1
     print_success "Nginx installed"
 
     print_step "Installing Certbot for SSL certificates..."
-    sudo apt-get install -y -qq certbot python3-certbot-nginx > /dev/null 2>&1
+    apt-get install -y -qq certbot python3-certbot-nginx > /dev/null 2>&1
     print_success "Certbot installed"
 
     print_step "Installing additional dependencies..."
-    sudo apt-get install -y -qq build-essential libffi-dev libssl-dev > /dev/null 2>&1
+    apt-get install -y -qq build-essential libffi-dev libssl-dev > /dev/null 2>&1
     print_success "Additional dependencies installed"
 
     print_success "All system dependencies installed successfully!"
@@ -198,12 +235,12 @@ clone_repository() {
     if [[ -d "$INSTALL_DIR" ]]; then
         print_warning "Directory $INSTALL_DIR already exists."
         print_step "Backing up existing directory..."
-        sudo mv "$INSTALL_DIR" "${INSTALL_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
+        mv "$INSTALL_DIR" "${INSTALL_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
         print_success "Backup created"
     fi
 
     print_step "Cloning repository to $INSTALL_DIR..."
-    git clone "$REPO_URL" "$INSTALL_DIR" > /dev/null 2>&1
+    su - "$CURRENT_USER" -c "git clone '$REPO_URL' '$INSTALL_DIR'" > /dev/null 2>&1
     print_success "Repository cloned successfully"
 
     cd "$INSTALL_DIR"
@@ -213,25 +250,17 @@ clone_repository() {
 setup_python_environment() {
     print_header "Setting Up Python Virtual Environment"
 
-    cd "$INSTALL_DIR"
-
     print_step "Creating virtual environment..."
-    $PYTHON_VERSION -m venv "$VENV_DIR"
+    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && $PYTHON_VERSION -m venv '$VENV_DIR'" > /dev/null 2>&1
     print_success "Virtual environment created"
 
-    print_step "Activating virtual environment..."
-    source "$VENV_DIR/bin/activate"
-    print_success "Virtual environment activated"
-
     print_step "Upgrading pip..."
-    pip install --upgrade pip > /dev/null 2>&1
+    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && pip install --upgrade pip" > /dev/null 2>&1
     print_success "Pip upgraded"
 
     print_step "Installing Python dependencies (this may take a few minutes)..."
-    pip install -r requirements.txt > /dev/null 2>&1
+    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && pip install -r requirements.txt" > /dev/null 2>&1
     print_success "All Python dependencies installed"
-
-    deactivate
 }
 
 configure_mysql() {
@@ -242,17 +271,17 @@ configure_mysql() {
     DB_PASSWORD=$(generate_password)
 
     print_step "Starting MySQL service..."
-    sudo systemctl start mysql
-    sudo systemctl enable mysql > /dev/null 2>&1
+    systemctl start mysql
+    systemctl enable mysql > /dev/null 2>&1
     print_success "MySQL service started"
 
     print_step "Creating database and user..."
 
     # Create database and user
-    sudo mysql -e "CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-    sudo mysql -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
-    sudo mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
-    sudo mysql -e "FLUSH PRIVILEGES;"
+    mysql -e "CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+    mysql -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
+    mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
+    mysql -e "FLUSH PRIVILEGES;"
 
     print_success "Database '$DB_NAME' created"
     print_success "User '$DB_USER' created with privileges"
@@ -264,13 +293,12 @@ configure_mysql() {
 create_env_file() {
     print_header "Creating Environment Configuration"
 
-    cd "$INSTALL_DIR"
-
     DJANGO_SECRET_KEY=$(generate_secret_key)
 
     print_step "Creating .env file..."
 
-    cat > .env << EOF
+    # Create .env file as root and then set proper ownership
+    cat > "$INSTALL_DIR/.env" << EOF
 APP_ENV=prod
 MYSQL_DATABASE_NAME=$DB_NAME
 MYSQL_DATABASE_USER=$DB_USER
@@ -287,7 +315,8 @@ ADMIN_LOG_OWNER_SECTION_NAME=Log owners
 SECRET_KEY=$DJANGO_SECRET_KEY
 EOF
 
-    chmod 600 .env
+    chown "$CURRENT_USER":"$CURRENT_USER" "$INSTALL_DIR/.env"
+    chmod 600 "$INSTALL_DIR/.env"
     print_success ".env file created with secure permissions"
 
     print_info "Database credentials saved in .env file"
@@ -296,26 +325,20 @@ EOF
 run_django_setup() {
     print_header "Running Django Setup"
 
-    cd "$INSTALL_DIR"
-    source "$VENV_DIR/bin/activate"
-
     print_step "Running database migrations..."
-    python manage.py migrate > /dev/null 2>&1
+    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && python manage.py migrate" > /dev/null 2>&1
     print_success "Database migrations completed"
 
     print_step "Collecting static files..."
-    python manage.py collectstatic --noinput > /dev/null 2>&1
+    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && python manage.py collectstatic --noinput" > /dev/null 2>&1
     print_success "Static files collected"
 
     # Create cache directory
-    mkdir -p django_cache
-    chmod 755 django_cache
+    su - "$CURRENT_USER" -c "mkdir -p '$INSTALL_DIR/django_cache' && chmod 755 '$INSTALL_DIR/django_cache'"
 
     # Create media directory
-    mkdir -p media
-    chmod 755 media
+    su - "$CURRENT_USER" -c "mkdir -p '$INSTALL_DIR/media' && chmod 755 '$INSTALL_DIR/media'"
 
-    deactivate
     print_success "Django setup completed"
 }
 
@@ -324,7 +347,7 @@ create_systemd_service() {
 
     print_step "Creating socket file..."
 
-    sudo tee /etc/systemd/system/${SERVICE_NAME}.socket > /dev/null << EOF
+    tee /etc/systemd/system/${SERVICE_NAME}.socket > /dev/null << EOF
 [Unit]
 Description=gunicorn socket for $APP_NAME
 
@@ -341,7 +364,7 @@ EOF
 
     print_step "Creating service file..."
 
-    sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null << EOF
+    tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null << EOF
 [Unit]
 Description=gunicorn daemon for $APP_NAME
 Requires=${SERVICE_NAME}.socket
@@ -366,16 +389,16 @@ EOF
     print_success "Service file created"
 
     print_step "Reloading systemd daemon..."
-    sudo systemctl daemon-reload
+    systemctl daemon-reload
     print_success "Systemd daemon reloaded"
 
     print_step "Enabling and starting socket..."
-    sudo systemctl enable ${SERVICE_NAME}.socket > /dev/null 2>&1
-    sudo systemctl start ${SERVICE_NAME}.socket
+    systemctl enable ${SERVICE_NAME}.socket > /dev/null 2>&1
+    systemctl start ${SERVICE_NAME}.socket
     print_success "Socket enabled and started"
 
     print_step "Starting service..."
-    sudo systemctl start ${SERVICE_NAME}.service
+    systemctl start ${SERVICE_NAME}.service
     print_success "Service started"
 }
 
@@ -384,7 +407,7 @@ configure_nginx() {
 
     print_step "Creating Nginx configuration..."
 
-    sudo tee /etc/nginx/sites-available/$DOMAIN_NAME > /dev/null << EOF
+    tee /etc/nginx/sites-available/$DOMAIN_NAME > /dev/null << EOF
 server {
     listen 80;
     server_name $DOMAIN_NAME;
@@ -420,20 +443,20 @@ EOF
     print_success "Nginx configuration created"
 
     print_step "Enabling site..."
-    sudo ln -sf /etc/nginx/sites-available/$DOMAIN_NAME /etc/nginx/sites-enabled/
+    ln -sf /etc/nginx/sites-available/$DOMAIN_NAME /etc/nginx/sites-enabled/
     print_success "Site enabled"
 
     print_step "Testing Nginx configuration..."
-    if sudo nginx -t > /dev/null 2>&1; then
+    if nginx -t > /dev/null 2>&1; then
         print_success "Nginx configuration is valid"
     else
         print_error "Nginx configuration test failed"
-        sudo nginx -t
+        nginx -t
         exit 1
     fi
 
     print_step "Restarting Nginx..."
-    sudo systemctl restart nginx
+    systemctl restart nginx
     print_success "Nginx restarted"
 }
 
@@ -441,22 +464,21 @@ setup_ssl_certificate() {
     print_header "Setting Up SSL Certificate"
 
     print_info "Obtaining SSL certificate from Let's Encrypt..."
-    print_warning "Make sure DNS is properly configured and pointing to this server!"
-    echo ""
+    print_info "Make sure DNS is properly configured and pointing to this server."
 
     print_step "Running Certbot..."
 
     # Run certbot with automatic configuration
-    if sudo certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos --register-unsafely-without-email --redirect; then
+    if certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --register-unsafely-without-email --redirect; then
         print_success "SSL certificate obtained and configured"
 
         print_step "Setting up automatic renewal..."
-        sudo systemctl enable certbot.timer > /dev/null 2>&1
-        sudo systemctl start certbot.timer
+        systemctl enable certbot.timer > /dev/null 2>&1
+        systemctl start certbot.timer
         print_success "Automatic certificate renewal enabled"
     else
         print_warning "SSL certificate setup failed. You can run it manually later:"
-        print_info "sudo certbot --nginx -d $DOMAIN_NAME"
+        print_info "certbot --nginx -d $DOMAIN_NAME"
     fi
 }
 
@@ -464,12 +486,12 @@ add_user_to_www_data() {
     print_header "Configuring User Permissions"
 
     print_step "Adding $CURRENT_USER to www-data group..."
-    sudo usermod -aG www-data $CURRENT_USER
+    usermod -aG www-data "$CURRENT_USER"
     print_success "User added to www-data group"
 
     print_step "Setting directory permissions..."
-    sudo chown -R $CURRENT_USER:www-data "$INSTALL_DIR"
-    sudo chmod -R 755 "$INSTALL_DIR"
+    chown -R "$CURRENT_USER":www-data "$INSTALL_DIR"
+    chmod -R 755 "$INSTALL_DIR"
     print_success "Directory permissions configured"
 }
 
@@ -523,6 +545,9 @@ show_completion_message() {
 #-------------------------------------------------------------------------------
 
 main() {
+    # Parse command line arguments first (before any output)
+    parse_arguments "$@"
+
     # Pre-flight checks
     check_root
     check_ubuntu
@@ -530,14 +555,14 @@ main() {
     # Show welcome banner
     show_banner
 
-    # Get domain name from user
-    get_domain_name
+    # Setup installer user and switch context
+    setup_installer_user
 
     echo ""
     print_info "Starting installation. This may take several minutes..."
-    print_info "Please do not interrupt the process."
+    print_info "Domain: $DOMAIN_NAME"
+    print_info "User: $CURRENT_USER"
     echo ""
-    sleep 2
 
     # Execute installation steps
     install_dependencies
