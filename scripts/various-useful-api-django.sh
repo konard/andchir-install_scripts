@@ -489,6 +489,10 @@ add_user_to_www_data() {
     usermod -aG www-data "$CURRENT_USER"
     print_success "User added to www-data group"
 
+    print_step "Adding www-data to $INSTALLER_USER group..."
+    usermod -aG "$INSTALLER_USER" www-data
+    print_success "www-data added to $INSTALLER_USER group (allows nginx access to static files)"
+
     print_step "Setting directory permissions..."
     chown -R "$CURRENT_USER":www-data "$INSTALL_DIR"
     chmod -R 755 "$INSTALL_DIR"
