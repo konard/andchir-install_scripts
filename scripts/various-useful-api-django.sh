@@ -226,6 +226,10 @@ install_dependencies() {
     apt-get install -y -qq build-essential libffi-dev libssl-dev > /dev/null 2>&1
     print_success "Additional dependencies installed"
 
+    print_step "Installing FFmpeg..."
+    apt-get install -y -qq ffmpeg > /dev/null 2>&1
+    print_success "FFmpeg installed"
+
     print_success "All system dependencies installed successfully!"
 }
 
@@ -336,8 +340,15 @@ run_django_setup() {
     # Create cache directory
     su - "$CURRENT_USER" -c "mkdir -p '$INSTALL_DIR/django_cache' && chmod 755 '$INSTALL_DIR/django_cache'"
 
-    # Create media directory
+    # Create media directory and subdirectories
     su - "$CURRENT_USER" -c "mkdir -p '$INSTALL_DIR/media' && chmod 755 '$INSTALL_DIR/media'"
+    su - "$CURRENT_USER" -c "mkdir -p '$INSTALL_DIR/media/video' && chmod 755 '$INSTALL_DIR/media/video'"
+    print_success "Media directories created"
+
+    print_step "Creating superuser (admin)..."
+    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && DJANGO_SUPERUSER_PASSWORD=admin python manage.py createsuperuser --username=admin --email=admin@user.com --noinput" > /dev/null 2>&1
+    print_success "Superuser created (username: admin, email: admin@user.com)"
+    print_warning "Default password is 'admin' - please change it after first login!"
 
     print_success "Django setup completed"
 }
@@ -534,8 +545,14 @@ show_completion_message() {
     echo -e "  ${CYAN}•${NC} Admin:         ${BOLD}https://$DOMAIN_NAME/admin/${NC}"
     echo ""
 
+    echo -e "${WHITE}Admin User:${NC}"
+    echo -e "  ${CYAN}•${NC} Username:      ${BOLD}admin${NC}"
+    echo -e "  ${CYAN}•${NC} Email:         ${BOLD}admin@user.com${NC}"
+    echo -e "  ${CYAN}•${NC} Password:      ${BOLD}admin${NC} ${YELLOW}(please change after first login!)${NC}"
+    echo ""
+
     echo -e "${YELLOW}Next Steps:${NC}"
-    echo -e "  ${CYAN}1.${NC} Create superuser:   ${BOLD}cd $INSTALL_DIR && source venv/bin/activate && python manage.py createsuperuser${NC}"
+    echo -e "  ${CYAN}1.${NC} Login to admin panel at ${BOLD}https://$DOMAIN_NAME/admin/${NC} and change the admin password"
     echo -e "  ${CYAN}2.${NC} Configure email settings in ${BOLD}$INSTALL_DIR/.env${NC} if needed"
     echo -e "  ${CYAN}3.${NC} Visit ${BOLD}https://$DOMAIN_NAME${NC} to verify the installation"
     echo ""
