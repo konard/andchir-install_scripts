@@ -39,6 +39,10 @@ env/
 *.log
 gunicorn-errors.txt
 
+# Database files
+*.db
+rate_limiter.db
+
 # OS
 .DS_Store
 Thumbs.db
