@@ -19,6 +19,7 @@ import argparse
 import logging
 import hashlib
 import threading
+from typing import Optional
 from functools import wraps
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
@@ -97,6 +98,49 @@ def generate_task_id(script_name, server_ip, server_root_password, additional=''
     return hashlib.md5(data.encode('utf-8')).hexdigest()
 
 
+def strip_ansi_codes(text: Optional[str]) -> Optional[str]:
+    """
+    Strip ANSI escape codes from text.
+
+    Removes all ANSI escape sequences including:
+    - Color codes (e.g., \\033[31m for red, \\033[0m for reset)
+    - Cursor movement codes
+    - Screen clear codes
+    - Other terminal control sequences
+
+    Args:
+        text: String that may contain ANSI escape sequences
+
+    Returns:
+        str: Clean text with all ANSI escape sequences removed,
+             or None/empty string if input is None/empty
+    """
+    if not text:
+        return text
+
+    # Pattern matches all ANSI escape sequences:
+    # - \x1b: ESC character
+    # - \[: CSI (Control Sequence Introducer)
+    # - [0-9;]*: Optional numeric parameters separated by semicolons
+    # - [A-Za-z]: Command character (m for color, H for cursor, etc.)
+    # Also matches OSC (Operating System Command) sequences: ESC ] ... BEL/ST
+    ansi_pattern = re.compile(
+        r'\x1b'           # ESC character
+        r'(?:'            # Non-capturing group for alternatives
+        r'\[[0-9;]*[A-Za-z]'  # CSI sequences (colors, cursor, etc.)
+        r'|'              # OR
+        r'\][^\x07]*\x07' # OSC sequences ending with BEL
+        r'|'              # OR
+        r'\][^\x1b]*\x1b\\' # OSC sequences ending with ST (ESC \)
+        r'|'              # OR
+        r'[PX^_][^\x1b]*\x1b\\' # DCS, SOS, PM, APC sequences
+        r'|'              # OR
+        r'[NOc]'          # Single character sequences (SS2, SS3, RIS)
+        r')'
+    )
+    return ansi_pattern.sub('', text)
+
+
 def get_task_file_path(task_id):
     """
     Get the full path to the task report file.
@@ -114,28 +158,38 @@ def write_task_status(task_id, status, content=''):
     """
     Write task status and content to the task report file.
 
+    ANSI escape codes (colors, cursor control, etc.) are automatically
+    stripped from the content to ensure clean, readable text in the report.
+
     Args:
         task_id: The task ID
         status: Current status (processing, completed, error)
         content: Content to append to the report
     """
     task_file = get_task_file_path(task_id)
+    # Strip ANSI escape codes from content for clean text output
+    clean_content = strip_ansi_codes(content) if content else ''
     with open(task_file, 'w', encoding='utf-8') as f:
         f.write(f"STATUS:{status}\n")
-        f.write(content)
+        f.write(clean_content)
 
 
 def append_task_content(task_id, content):
     """
     Append content to the task report file without changing status.
 
+    ANSI escape codes (colors, cursor control, etc.) are automatically
+    stripped from the content to ensure clean, readable text in the report.
+
     Args:
         task_id: The task ID
         content: Content to append to the report
     """
     task_file = get_task_file_path(task_id)
+    # Strip ANSI escape codes from content for clean text output
+    clean_content = strip_ansi_codes(content) if content else ''
     with open(task_file, 'a', encoding='utf-8') as f:
-        f.write(content)
+        f.write(clean_content)
 
 
 def read_task_status(task_id):
@@ -768,10 +822,14 @@ def get_task_status(task_id):
                 'result': None
             }), 404
 
+        # Strip any remaining ANSI escape codes from content
+        # (content should already be clean, but this ensures backward compatibility)
+        clean_content = strip_ansi_codes(content) if content else content
+
         response = {
             'success': True,
             'status': status,
-            'result': content
+            'result': clean_content
         }
 
         # If task is completed or has an error, delete the file after returning

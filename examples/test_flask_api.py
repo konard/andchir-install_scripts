@@ -18,7 +18,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 from app import (
     app, parse_args, execute_script_via_ssh, SSH_AVAILABLE,
     generate_task_id, get_task_file_path, write_task_status, read_task_status,
-    delete_task_file, TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_ERROR,
+    delete_task_file, append_task_content, strip_ansi_codes,
+    TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_ERROR,
     TASKS_DIR
 )
 
@@ -580,6 +581,149 @@ class TestStatusEndpoint(unittest.TestCase):
         self.assertEqual(response2.status_code, 404)
         data = response2.get_json()
         self.assertIn('Task not found', data['error'])
+
+
+class TestStripAnsiCodes(unittest.TestCase):
+    """Test cases for the strip_ansi_codes function."""
+
+    def test_strip_basic_colors(self):
+        """Test stripping basic color codes."""
+        self.assertEqual(strip_ansi_codes("\033[31mRed text\033[0m"), "Red text")
+        self.assertEqual(strip_ansi_codes("\033[32mGreen text\033[0m"), "Green text")
+        self.assertEqual(strip_ansi_codes("\033[1;34mBold blue\033[0m"), "Bold blue")
+
+    def test_strip_extended_colors(self):
+        """Test stripping extended color codes."""
+        self.assertEqual(strip_ansi_codes("\033[38;5;196mExtended color\033[0m"), "Extended color")
+        self.assertEqual(strip_ansi_codes("\033[48;2;255;0;0mTrue color bg\033[0m"), "True color bg")
+
+    def test_strip_multiple_colors(self):
+        """Test stripping multiple color codes in one line."""
+        self.assertEqual(
+            strip_ansi_codes("\033[31mRed\033[0m and \033[32mGreen\033[0m"),
+            "Red and Green"
+        )
+
+    def test_strip_common_script_output(self):
+        """Test stripping colors from common script output patterns."""
+        self.assertEqual(
+            strip_ansi_codes("[ \033[32mOK\033[0m ] Service started"),
+            "[ OK ] Service started"
+        )
+        self.assertEqual(
+            strip_ansi_codes("[\033[31mFAIL\033[0m] Service failed"),
+            "[FAIL] Service failed"
+        )
+
+    def test_strip_cursor_movement_codes(self):
+        """Test stripping cursor movement codes."""
+        self.assertEqual(strip_ansi_codes("\033[2J\033[H"), "")  # Clear screen
+        self.assertEqual(strip_ansi_codes("Line 1\033[A"), "Line 1")  # Cursor up
+
+    def test_strip_erase_line_codes(self):
+        """Test stripping erase line codes."""
+        self.assertEqual(strip_ansi_codes("Progress: \033[K50%"), "Progress: 50%")
+
+    def test_strip_only_escape_sequences(self):
+        """Test that lines with only escape sequences become empty."""
+        self.assertEqual(strip_ansi_codes("\033[0m\033[K"), "")
+
+    def test_preserve_empty_string(self):
+        """Test that empty strings are handled correctly."""
+        self.assertEqual(strip_ansi_codes(""), "")
+
+    def test_preserve_none(self):
+        """Test that None is handled correctly."""
+        self.assertIsNone(strip_ansi_codes(None))
+
+    def test_preserve_plain_text(self):
+        """Test that plain text without escape codes is preserved."""
+        self.assertEqual(
+            strip_ansi_codes("Plain text without escape codes"),
+            "Plain text without escape codes"
+        )
+
+    def test_preserve_newlines(self):
+        """Test that newlines are preserved."""
+        self.assertEqual(
+            strip_ansi_codes("Line 1\nLine 2\n\033[32mLine 3\033[0m\n"),
+            "Line 1\nLine 2\nLine 3\n"
+        )
+
+    def test_strip_hex_escape_format(self):
+        """Test stripping hex escape character format."""
+        self.assertEqual(strip_ansi_codes("\x1b[31mRed\x1b[0m"), "Red")
+
+    def test_strip_text_formatting(self):
+        """Test stripping bold, italic, underline codes."""
+        self.assertEqual(strip_ansi_codes("\033[1mBold\033[0m"), "Bold")
+        self.assertEqual(strip_ansi_codes("\033[3mItalic\033[0m"), "Italic")
+        self.assertEqual(strip_ansi_codes("\033[4mUnderline\033[0m"), "Underline")
+
+    def test_strip_combined_attributes(self):
+        """Test stripping combined formatting attributes."""
+        self.assertEqual(
+            strip_ansi_codes("\033[1;4;31mBold underline red\033[0m"),
+            "Bold underline red"
+        )
+
+
+class TestAnsiStrippingIntegration(unittest.TestCase):
+    """Test ANSI code stripping integration with task functions."""
+
+    def setUp(self):
+        """Set up test environment."""
+        os.makedirs(TASKS_DIR, exist_ok=True)
+        # Use a valid MD5 hash format (32 hex characters) for task_id
+        # Using a different task_id than TestStatusEndpoint to avoid conflicts
+        self.test_task_id = 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5'
+
+    def tearDown(self):
+        """Clean up test task files."""
+        task_file = get_task_file_path(self.test_task_id)
+        if os.path.exists(task_file):
+            os.remove(task_file)
+
+    def test_write_task_status_strips_ansi(self):
+        """Test that write_task_status strips ANSI codes from content."""
+        colored_content = "[\033[32mOK\033[0m] Installation \033[1;34mcomplete\033[0m"
+        expected_content = "[OK] Installation complete"
+
+        write_task_status(self.test_task_id, TASK_STATUS_COMPLETED, colored_content)
+        status, content = read_task_status(self.test_task_id)
+
+        self.assertEqual(status, TASK_STATUS_COMPLETED)
+        self.assertEqual(content, expected_content)
+
+    def test_append_task_content_strips_ansi(self):
+        """Test that append_task_content strips ANSI codes from content."""
+        write_task_status(self.test_task_id, TASK_STATUS_PROCESSING, "Starting...\n")
+
+        colored_line = "\033[33mProcessing...\033[0m\n"
+        append_task_content(self.test_task_id, colored_line)
+
+        status, content = read_task_status(self.test_task_id)
+        self.assertIn("Starting...", content)
+        self.assertIn("Processing...", content)
+        self.assertNotIn("\033", content)  # No escape characters
+
+    def test_status_endpoint_returns_clean_content(self):
+        """Test that /api/status endpoint returns content without ANSI codes."""
+        # Write content with ANSI codes (simulating old data that might still have codes)
+        task_file = get_task_file_path(self.test_task_id)
+        with open(task_file, 'w', encoding='utf-8') as f:
+            f.write(f"STATUS:{TASK_STATUS_COMPLETED}\n")
+            f.write("[\033[32mOK\033[0m] Done")
+
+        app.config['TESTING'] = True
+        client = app.test_client()
+
+        response = client.get(f'/api/status/{self.test_task_id}')
+        data = response.get_json()
+
+        self.assertTrue(data['success'])
+        self.assertEqual(data['result'], "[OK] Done")
+        self.assertNotIn("\033", data['result'])
 
 
 if __name__ == '__main__':
