@@ -22,5 +22,11 @@
     "script_name": "pocketbase",
     "description": "Бэкенд на Go с встроенной базой данных SQLite, аутентификацией, хранилищем файлов и админ-панелью",
     "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "mysql/phpmyadmin",
+    "script_name": "mysql-phpmyadmin",
+    "description": "Сервер базы данных MySQL с веб-интерфейсом phpMyAdmin",
+    "info": "Необходимый параметр: доменное имя"
   }
 ]

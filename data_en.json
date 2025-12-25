@@ -22,5 +22,11 @@
     "script_name": "pocketbase",
     "description": "Go backend with built-in SQLite database, authentication, file storage and admin dashboard",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "mysql/phpmyadmin",
+    "script_name": "mysql-phpmyadmin",
+    "description": "MySQL database server with phpMyAdmin web interface",
+    "info": "Required parameter: domain name"
   }
 ]
