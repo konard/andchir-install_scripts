@@ -3,10 +3,18 @@
 Flask API Application for Install Scripts
 
 This API provides endpoints to manage and list installation scripts.
+
+Usage:
+    python app.py [--port PORT] [--host HOST]
+
+Arguments:
+    --port PORT  Port to run the server on (default: 5000)
+    --host HOST  Host to bind the server to (default: 0.0.0.0)
 """
 
 import os
 import json
+import argparse
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
@@ -195,6 +203,46 @@ def index():
     })
 
 
+def parse_args():
+    """
+    Parse command-line arguments.
+
+    Returns:
+        Parsed arguments namespace.
+    """
+    parser = argparse.ArgumentParser(
+        description='Flask API Application for Install Scripts'
+    )
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=5000,
+        help='Port to run the server on (default: 5000)'
+    )
+    parser.add_argument(
+        '--host',
+        type=str,
+        default='0.0.0.0',
+        help='Host to bind the server to (default: 0.0.0.0)'
+    )
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        default=True,
+        help='Run in debug mode (default: True)'
+    )
+    parser.add_argument(
+        '--no-debug',
+        action='store_true',
+        help='Disable debug mode'
+    )
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
+    # Parse command-line arguments
+    args = parse_args()
+    debug_mode = args.debug and not args.no_debug
+
     # Development server
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host=args.host, port=args.port, debug=debug_mode)
