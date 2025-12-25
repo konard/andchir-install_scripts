@@ -264,17 +264,22 @@ clone_repository() {
 setup_python_environment() {
     print_header "Setting Up Python Virtual Environment"
 
-    print_step "Creating virtual environment..."
-    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && $PYTHON_VERSION -m venv '$VENV_DIR'" > /dev/null 2>&1
-    print_success "Virtual environment created"
+    if [[ -d "$VENV_DIR" ]]; then
+        print_info "Virtual environment already exists at $VENV_DIR"
+        print_step "Using existing virtual environment..."
+    else
+        print_step "Creating virtual environment..."
+        su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && $PYTHON_VERSION -m venv '$VENV_DIR'" > /dev/null 2>&1
+        print_success "Virtual environment created"
+    fi
 
     print_step "Upgrading pip..."
     su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && pip install --upgrade pip" > /dev/null 2>&1
     print_success "Pip upgraded"
 
-    print_step "Installing Python dependencies (this may take a few minutes)..."
+    print_step "Installing/updating Python dependencies (this may take a few minutes)..."
     su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && pip install -r requirements.txt" > /dev/null 2>&1
-    print_success "All Python dependencies installed"
+    print_success "All Python dependencies installed/updated"
 }
 
 configure_mysql() {
