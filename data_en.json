@@ -34,5 +34,11 @@
     "script_name": "postgresql-mathesar",
     "description": "PostgreSQL database server with Mathesar web interface",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "gtsteffaniak/filebrowser",
+    "script_name": "filebrowser",
+    "description": "Web file manager with modern interface and advanced features",
+    "info": "Required parameter: domain name"
   }
 ]

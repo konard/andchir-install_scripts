@@ -34,5 +34,11 @@
     "script_name": "postgresql-mathesar",
     "description": "Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar",
     "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "gtsteffaniak/filebrowser",
+    "script_name": "filebrowser",
+    "description": "Веб-файловый менеджер с современным интерфейсом и расширенными возможностями",
+    "info": "Необходимый параметр: доменное имя"
   }
 ]
