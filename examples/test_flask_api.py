@@ -8,12 +8,14 @@ Run this script from the repository root directory.
 
 import os
 import sys
+import json
 import unittest
+from unittest.mock import patch, MagicMock
 
 # Add the api directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'api'))
 
-from app import app, parse_args
+from app import app, parse_args, execute_script_via_ssh, SSH_AVAILABLE
 
 
 class TestParseArgs(unittest.TestCase):
@@ -186,6 +188,270 @@ class TestFlaskAPI(unittest.TestCase):
             script_data = response.get_json()
             self.assertTrue(script_data['success'])
             self.assertEqual(script_data['result']['script_name'], script_name)
+
+
+class TestInstallEndpoint(unittest.TestCase):
+    """Test cases for the /api/install endpoint."""
+
+    def setUp(self):
+        """Set up test client."""
+        self.app = app
+        self.app.config['TESTING'] = True
+        self.client = self.app.test_client()
+
+    def test_install_endpoint_missing_body(self):
+        """Test that /api/install returns 400 when no JSON body is provided."""
+        response = self.client.post('/api/install', content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        data = response.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn('error', data)
+
+    def test_install_endpoint_missing_fields(self):
+        """Test that /api/install returns 400 when required fields are missing."""
+        # Missing all required fields
+        response = self.client.post('/api/install',
+                                    data=json.dumps({}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        data = response.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn('Missing required fields', data['error'])
+
+        # Missing server_ip and server_root_password
+        response = self.client.post('/api/install',
+                                    data=json.dumps({'script_name': 'test'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        data = response.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn('server_ip', data['error'])
+
+    def test_install_endpoint_invalid_script_name(self):
+        """Test that /api/install returns 400 for invalid script_name format."""
+        response = self.client.post('/api/install',
+                                    data=json.dumps({
+                                        'script_name': 'test; rm -rf /',
+                                        'server_ip': '192.168.1.1',
+                                        'server_root_password': 'password'
+                                    }),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        data = response.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn('Invalid script_name format', data['error'])
+
+    def test_install_endpoint_invalid_ip(self):
+        """Test that /api/install returns 400 for invalid IP address."""
+        response = self.client.post('/api/install',
+                                    data=json.dumps({
+                                        'script_name': 'test-script',
+                                        'server_ip': 'invalid-ip',
+                                        'server_root_password': 'password'
+                                    }),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        data = response.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn('Invalid server_ip format', data['error'])
+
+    def test_install_endpoint_valid_script_name_formats(self):
+        """Test that script_name validation accepts valid formats."""
+        # These should all pass validation and fail at SSH stage
+        valid_names = ['test', 'test-script', 'test_script', 'script123']
+        for name in valid_names:
+            response = self.client.post('/api/install',
+                                        data=json.dumps({
+                                            'script_name': name,
+                                            'server_ip': '192.168.1.1',
+                                            'server_root_password': 'password'
+                                        }),
+                                        content_type='application/json')
+            # Should not be 400 for script_name validation
+            data = response.get_json()
+            if response.status_code == 400:
+                self.assertNotIn('Invalid script_name format', data.get('error', ''))
+
+    @unittest.skipIf(not SSH_AVAILABLE, "paramiko not installed")
+    @patch('app.paramiko.SSHClient')
+    def test_install_endpoint_ssh_success(self, mock_ssh_class):
+        """Test successful script execution via SSH."""
+        # Mock SSH client
+        mock_ssh = MagicMock()
+        mock_ssh_class.return_value = mock_ssh
+
+        # Mock stdout and stderr
+        mock_stdout = MagicMock()
+        mock_stdout.read.return_value = b'Script executed successfully'
+        mock_stdout.channel.recv_exit_status.return_value = 0
+
+        mock_stderr = MagicMock()
+        mock_stderr.read.return_value = b''
+
+        mock_ssh.exec_command.return_value = (MagicMock(), mock_stdout, mock_stderr)
+
+        response = self.client.post('/api/install',
+                                    data=json.dumps({
+                                        'script_name': 'pocketbase',
+                                        'server_ip': '192.168.1.1',
+                                        'server_root_password': 'testpassword',
+                                        'additional': 'example.com'
+                                    }),
+                                    content_type='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data['success'])
+        self.assertIn('Script executed successfully', data['output'])
+
+    @unittest.skipIf(not SSH_AVAILABLE, "paramiko not installed")
+    @patch('app.paramiko.SSHClient')
+    def test_install_endpoint_ssh_failure(self, mock_ssh_class):
+        """Test failed script execution via SSH."""
+        # Mock SSH client
+        mock_ssh = MagicMock()
+        mock_ssh_class.return_value = mock_ssh
+
+        # Mock stdout and stderr with failure
+        mock_stdout = MagicMock()
+        mock_stdout.read.return_value = b'Error occurred'
+        mock_stdout.channel.recv_exit_status.return_value = 1
+
+        mock_stderr = MagicMock()
+        mock_stderr.read.return_value = b'Script failed'
+
+        mock_ssh.exec_command.return_value = (MagicMock(), mock_stdout, mock_stderr)
+
+        response = self.client.post('/api/install',
+                                    data=json.dumps({
+                                        'script_name': 'pocketbase',
+                                        'server_ip': '192.168.1.1',
+                                        'server_root_password': 'testpassword'
+                                    }),
+                                    content_type='application/json')
+
+        self.assertEqual(response.status_code, 500)
+        data = response.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn('exited with status', data['error'])
+
+    @unittest.skipIf(not SSH_AVAILABLE, "paramiko not installed")
+    @patch('app.paramiko.SSHClient')
+    def test_install_endpoint_ssh_auth_failure(self, mock_ssh_class):
+        """Test SSH authentication failure."""
+        import paramiko
+
+        # Mock SSH client to raise AuthenticationException
+        mock_ssh = MagicMock()
+        mock_ssh_class.return_value = mock_ssh
+        mock_ssh.connect.side_effect = paramiko.AuthenticationException('Authentication failed')
+
+        response = self.client.post('/api/install',
+                                    data=json.dumps({
+                                        'script_name': 'pocketbase',
+                                        'server_ip': '192.168.1.1',
+                                        'server_root_password': 'wrongpassword'
+                                    }),
+                                    content_type='application/json')
+
+        self.assertEqual(response.status_code, 500)
+        data = response.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn('authentication failed', data['error'].lower())
+
+
+class TestExecuteScriptViaSSH(unittest.TestCase):
+    """Test cases for the execute_script_via_ssh function."""
+
+    @unittest.skipIf(not SSH_AVAILABLE, "paramiko not installed")
+    @patch('app.paramiko.SSHClient')
+    def test_execute_script_success(self, mock_ssh_class):
+        """Test successful script execution."""
+        mock_ssh = MagicMock()
+        mock_ssh_class.return_value = mock_ssh
+
+        mock_stdout = MagicMock()
+        mock_stdout.read.return_value = b'Success'
+        mock_stdout.channel.recv_exit_status.return_value = 0
+
+        mock_stderr = MagicMock()
+        mock_stderr.read.return_value = b''
+
+        mock_ssh.exec_command.return_value = (MagicMock(), mock_stdout, mock_stderr)
+
+        success, output, error = execute_script_via_ssh(
+            server_ip='192.168.1.1',
+            server_root_password='password',
+            script_name='test-script'
+        )
+
+        self.assertTrue(success)
+        self.assertEqual(output, 'Success')
+        self.assertIsNone(error)
+
+    @unittest.skipIf(not SSH_AVAILABLE, "paramiko not installed")
+    @patch('app.paramiko.SSHClient')
+    def test_execute_script_with_additional_params(self, mock_ssh_class):
+        """Test script execution with additional parameters."""
+        mock_ssh = MagicMock()
+        mock_ssh_class.return_value = mock_ssh
+
+        mock_stdout = MagicMock()
+        mock_stdout.read.return_value = b'Done'
+        mock_stdout.channel.recv_exit_status.return_value = 0
+
+        mock_stderr = MagicMock()
+        mock_stderr.read.return_value = b''
+
+        mock_ssh.exec_command.return_value = (MagicMock(), mock_stdout, mock_stderr)
+
+        success, output, error = execute_script_via_ssh(
+            server_ip='192.168.1.1',
+            server_root_password='password',
+            script_name='test-script',
+            additional='example.com'
+        )
+
+        self.assertTrue(success)
+        # Verify the command includes the additional parameter
+        mock_ssh.exec_command.assert_called_once()
+        call_args = mock_ssh.exec_command.call_args[0][0]
+        self.assertIn('example.com', call_args)
+
+    @unittest.skipIf(not SSH_AVAILABLE, "paramiko not installed")
+    @patch('app.paramiko.SSHClient')
+    def test_execute_script_connection_timeout(self, mock_ssh_class):
+        """Test handling of connection timeout."""
+        mock_ssh = MagicMock()
+        mock_ssh_class.return_value = mock_ssh
+        mock_ssh.connect.side_effect = TimeoutError('Connection timed out')
+
+        success, output, error = execute_script_via_ssh(
+            server_ip='192.168.1.1',
+            server_root_password='password',
+            script_name='test-script'
+        )
+
+        self.assertFalse(success)
+        self.assertEqual(output, '')
+        self.assertIn('timed out', error)
+
+
+class TestIndexEndpointWithInstall(unittest.TestCase):
+    """Test that index endpoint includes install route."""
+
+    def setUp(self):
+        """Set up test client."""
+        self.app = app
+        self.app.config['TESTING'] = True
+        self.client = self.app.test_client()
+
+    def test_index_includes_install_endpoint(self):
+        """Test that the root endpoint lists the /api/install endpoint."""
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIn('/api/install', data['endpoints'])
 
 
 if __name__ == '__main__':
