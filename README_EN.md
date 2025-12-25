@@ -22,6 +22,7 @@ This project provides a set of bash scripts for quick deployment of popular soft
 | `pocketbase.sh` | Go backend with built-in SQLite database, authentication, file storage and admin dashboard |
 | `mysql-phpmyadmin.sh` | MySQL database server with phpMyAdmin web interface |
 | `postgresql-mathesar.sh` | PostgreSQL database server with Mathesar web interface |
+| `wireguard-wireguard-ui.sh` | WireGuard VPN server with WireGuard-UI web management interface |
 
 ## Usage
 

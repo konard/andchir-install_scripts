@@ -34,5 +34,11 @@
     "script_name": "postgresql-mathesar",
     "description": "PostgreSQL database server with Mathesar web interface",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "ngoduykhanh/wireguard-ui",
+    "script_name": "wireguard-wireguard-ui",
+    "description": "WireGuard VPN server with WireGuard-UI web management interface",
+    "info": "Required parameter: domain name"
   }
 ]
