@@ -99,82 +99,8 @@ def generate_task_id(script_name, server_ip, server_root_password, additional=''
 
 
 def strip_ansi_codes(text: Optional[str]) -> Optional[str]:
-    """
-    Strip ANSI escape codes and control characters from text.
-
-    Removes all ANSI escape sequences including:
-    - Color codes (e.g., \\033[31m for red, \\033[0m for reset)
-    - Cursor movement codes
-    - Screen clear codes
-    - Other terminal control sequences
-    - Caret notation escape sequences (^[[0;36m, ^[[0m, etc.)
-
-    Also removes non-printable control characters:
-    - NULL characters (\\x00) and caret notation (^@)
-    - Other control characters (\\x01-\\x08, \\x0b, \\x0c, \\x0e-\\x1f, \\x7f)
-    - Preserves common whitespace: tab (\\x09), newline (\\x0a), carriage return (\\x0d)
-
-    Args:
-        text: String that may contain ANSI escape sequences
-
-    Returns:
-        str: Clean text with all ANSI escape sequences removed,
-             or None/empty string if input is None/empty
-    """
-    if not text:
-        return text
-
-    # Pattern matches all ANSI escape sequences:
-    # - \x1b: ESC character
-    # - \[: CSI (Control Sequence Introducer)
-    # - [0-9;]*: Optional numeric parameters separated by semicolons
-    # - [A-Za-z]: Command character (m for color, H for cursor, etc.)
-    # Also matches OSC (Operating System Command) sequences: ESC ] ... BEL/ST
-    ansi_pattern = re.compile(
-        r'\x1b'           # ESC character
-        r'(?:'            # Non-capturing group for alternatives
-        r'\[[0-9;]*[A-Za-z]'  # CSI sequences (colors, cursor, etc.)
-        r'|'              # OR
-        r'\][^\x07]*\x07' # OSC sequences ending with BEL
-        r'|'              # OR
-        r'\][^\x1b]*\x1b\\' # OSC sequences ending with ST (ESC \)
-        r'|'              # OR
-        r'[PX^_][^\x1b]*\x1b\\' # DCS, SOS, PM, APC sequences
-        r'|'              # OR
-        r'[NOc]'          # Single character sequences (SS2, SS3, RIS)
-        r')'
-    )
-    result = ansi_pattern.sub('', text)
-
-    # Strip caret notation for ANSI escape sequences
-    # Some terminals output ^[ instead of actual ESC character (\x1b)
-    # Pattern matches: ^[[0;36m, ^[[1;37m, ^[[0m, ^[[H, ^[[J, etc.
-    # Also handles \^[ which appears in some JSON-escaped outputs
-    caret_ansi_pattern = re.compile(
-        r'\\?\^'          # Optional backslash followed by caret (^ or \^)
-        r'\['             # Literal [
-        r'\['             # Literal [ (CSI introducer)
-        r'[0-9;]*'        # Optional numeric parameters
-        r'[A-Za-z]?'      # Optional command character
-    )
-    result = caret_ansi_pattern.sub('', result)
-
-    # Strip caret notation for control characters (^@, ^A, ^B, etc.)
-    # ^@ = NUL (0x00), ^A = SOH (0x01), ... ^Z = SUB (0x1A), ^[ = ESC, etc.
-    # Also handles \^@ which appears in some JSON-escaped outputs
-    # We keep ^I (tab), ^J (newline), ^M (carriage return) - but these rarely appear as caret notation
-    caret_control_pattern = re.compile(
-        r'\\?\^'          # Optional backslash followed by caret
-        r'[@A-HK-LN-Z\[\\\]^_?]'  # Control chars except I, J, M (tab, newline, CR)
-    )
-    result = caret_control_pattern.sub('', result)
-
-    # Also strip NULL characters and other non-printable control characters
-    # except for common whitespace (tab, newline, carriage return)
-    # Control characters are 0x00-0x1F and 0x7F
-    # We keep: 0x09 (tab), 0x0A (newline), 0x0D (carriage return)
-    control_pattern = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
-    result = control_pattern.sub('', result)
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    result = ansi_escape.sub('', text)
 
     return result
 
