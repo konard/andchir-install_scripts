@@ -1,0 +1,20 @@
+[
+  {
+      "name": "andchir/install_scripts",
+      "script_name": "install-scripts-api-flask",
+      "description": "API for installing software on a remote Ubuntu server",
+      "info": "Required parameter: domain name"
+    },
+    {
+      "name": "andchir/various-useful-api-django",
+      "script_name": "various-useful-api-django",
+      "description": "A collection of useful APIs using Django",
+      "info": "Required parameter: domain name"
+    },
+  {
+    "name": "andchir/openchatroulette",
+    "script_name": "openchatroulette",
+      "description": "Video chat roulette",
+      "info": "Required parameter: domain name"
+  }
+]
