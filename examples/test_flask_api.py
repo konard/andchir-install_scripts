@@ -667,6 +667,60 @@ class TestStripAnsiCodes(unittest.TestCase):
             "Bold underline red"
         )
 
+    def test_strip_null_characters(self):
+        """Test stripping NULL characters (\\x00)."""
+        self.assertEqual(strip_ansi_codes("Hello\x00World"), "HelloWorld")
+        self.assertEqual(strip_ansi_codes("\x00\x00\x00Text\x00\x00"), "Text")
+        # Many NULL characters as seen in real terminal output
+        self.assertEqual(
+            strip_ansi_codes("Before\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00After"),
+            "BeforeAfter"
+        )
+
+    def test_strip_other_control_characters(self):
+        """Test stripping other non-printable control characters."""
+        # Bell character (\\x07) - note: BEL is stripped as part of control chars
+        self.assertEqual(strip_ansi_codes("Text\x07here"), "Texthere")
+        # Backspace (\\x08)
+        self.assertEqual(strip_ansi_codes("Text\x08here"), "Texthere")
+        # Vertical tab (\\x0b)
+        self.assertEqual(strip_ansi_codes("Text\x0bhere"), "Texthere")
+        # Form feed (\\x0c)
+        self.assertEqual(strip_ansi_codes("Text\x0chere"), "Texthere")
+        # Delete (\\x7f)
+        self.assertEqual(strip_ansi_codes("Text\x7fhere"), "Texthere")
+
+    def test_preserve_tabs_and_newlines(self):
+        """Test that tabs (\\x09) and newlines (\\x0a) are preserved."""
+        self.assertEqual(strip_ansi_codes("Line1\nLine2"), "Line1\nLine2")
+        self.assertEqual(strip_ansi_codes("Col1\tCol2"), "Col1\tCol2")
+        self.assertEqual(strip_ansi_codes("Line1\r\nLine2"), "Line1\r\nLine2")
+
+    def test_strip_mixed_ansi_and_control_chars(self):
+        """Test stripping mixed ANSI codes and control characters."""
+        input_text = "\x1b[32mGreen\x1b[0m\x00\x00\x00Text\x1b[H\x1b[J"
+        expected = "GreenText"
+        self.assertEqual(strip_ansi_codes(input_text), expected)
+
+    def test_strip_complex_terminal_output(self):
+        """Test stripping complex terminal output similar to real-world data."""
+        # Simulating output like in the issue
+        input_text = (
+            "Starting installation...\n"
+            "\x1b[0;36m╔═══════════════════════════╗\x1b[0m\n"
+            "\x1b[0;36m║\x1b[0m  \x1b[1;37mDomain Config\x1b[0m\n"
+            "\x1b[H\x1b[J"  # Screen clear
+            "\x00\x00\x00\x00\x00\x00\x00\x00"  # NULL characters
+            "\x1b[0;32m✔\x1b[0m Done\n"
+        )
+        expected = (
+            "Starting installation...\n"
+            "╔═══════════════════════════╗\n"
+            "║  Domain Config\n"
+            "✔ Done\n"
+        )
+        self.assertEqual(strip_ansi_codes(input_text), expected)
+
 
 class TestAnsiStrippingIntegration(unittest.TestCase):
     """Test ANSI code stripping integration with task functions."""
@@ -724,6 +778,48 @@ class TestAnsiStrippingIntegration(unittest.TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(data['result'], "[OK] Done")
         self.assertNotIn("\033", data['result'])
+
+    def test_write_task_status_strips_null_chars(self):
+        """Test that write_task_status strips NULL characters from content."""
+        content_with_nulls = "Text\x00\x00\x00before\x00after"
+        expected_content = "Textbeforeafter"
+
+        write_task_status(self.test_task_id, TASK_STATUS_COMPLETED, content_with_nulls)
+        status, content = read_task_status(self.test_task_id)
+
+        self.assertEqual(status, TASK_STATUS_COMPLETED)
+        self.assertEqual(content, expected_content)
+        self.assertNotIn("\x00", content)
+
+    def test_append_task_content_strips_null_chars(self):
+        """Test that append_task_content strips NULL characters."""
+        write_task_status(self.test_task_id, TASK_STATUS_PROCESSING, "Start\n")
+
+        content_with_nulls = "\x00\x00\x00Processing\x00\x00\n"
+        append_task_content(self.test_task_id, content_with_nulls)
+
+        status, content = read_task_status(self.test_task_id)
+        self.assertIn("Start", content)
+        self.assertIn("Processing", content)
+        self.assertNotIn("\x00", content)
+
+    def test_status_endpoint_strips_null_chars_from_old_data(self):
+        """Test that /api/status endpoint strips NULL chars from existing files."""
+        # Write content with NULL characters (simulating old data)
+        task_file = get_task_file_path(self.test_task_id)
+        with open(task_file, 'w', encoding='utf-8') as f:
+            f.write(f"STATUS:{TASK_STATUS_COMPLETED}\n")
+            f.write("Text\x00\x00\x00with\x00nulls")
+
+        app.config['TESTING'] = True
+        client = app.test_client()
+
+        response = client.get(f'/api/status/{self.test_task_id}')
+        data = response.get_json()
+
+        self.assertTrue(data['success'])
+        self.assertEqual(data['result'], "Textwithnulls")
+        self.assertNotIn("\x00", data['result'])
 
 
 if __name__ == '__main__':

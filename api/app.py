@@ -100,13 +100,18 @@ def generate_task_id(script_name, server_ip, server_root_password, additional=''
 
 def strip_ansi_codes(text: Optional[str]) -> Optional[str]:
     """
-    Strip ANSI escape codes from text.
+    Strip ANSI escape codes and control characters from text.
 
     Removes all ANSI escape sequences including:
     - Color codes (e.g., \\033[31m for red, \\033[0m for reset)
     - Cursor movement codes
     - Screen clear codes
     - Other terminal control sequences
+
+    Also removes non-printable control characters:
+    - NULL characters (\\x00)
+    - Other control characters (\\x01-\\x08, \\x0b, \\x0c, \\x0e-\\x1f, \\x7f)
+    - Preserves common whitespace: tab (\\x09), newline (\\x0a), carriage return (\\x0d)
 
     Args:
         text: String that may contain ANSI escape sequences
@@ -138,7 +143,16 @@ def strip_ansi_codes(text: Optional[str]) -> Optional[str]:
         r'[NOc]'          # Single character sequences (SS2, SS3, RIS)
         r')'
     )
-    return ansi_pattern.sub('', text)
+    result = ansi_pattern.sub('', text)
+
+    # Also strip NULL characters and other non-printable control characters
+    # except for common whitespace (tab, newline, carriage return)
+    # Control characters are 0x00-0x1F and 0x7F
+    # We keep: 0x09 (tab), 0x0A (newline), 0x0D (carriage return)
+    control_pattern = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
+    result = control_pattern.sub('', result)
+
+    return result
 
 
 def get_task_file_path(task_id):

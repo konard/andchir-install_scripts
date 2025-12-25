@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Test script to verify ANSI escape sequence stripping functionality.
+Test script to verify ANSI escape sequence and control character stripping functionality.
 
-This script tests various ANSI escape sequences that might be present
+This script tests various ANSI escape sequences and control characters that might be present
 in terminal output from shell scripts.
 """
 
@@ -11,13 +11,18 @@ import re
 
 def strip_ansi_codes(text):
     """
-    Strip ANSI escape codes from text.
+    Strip ANSI escape codes and control characters from text.
 
     Removes all ANSI escape sequences including:
     - Color codes (e.g., \033[31m for red, \033[0m for reset)
     - Cursor movement codes
     - Screen clear codes
     - Other terminal control sequences
+
+    Also removes non-printable control characters:
+    - NULL characters (\x00)
+    - Other control characters (\x01-\x08, \x0b, \x0c, \x0e-\x1f, \x7f)
+    - Preserves common whitespace: tab (\x09), newline (\x0a), carriage return (\x0d)
 
     Args:
         text: String that may contain ANSI escape sequences
@@ -48,7 +53,16 @@ def strip_ansi_codes(text):
         r'[NOc]'          # Single character sequences (SS2, SS3, RIS)
         r')'
     )
-    return ansi_pattern.sub('', text)
+    result = ansi_pattern.sub('', text)
+
+    # Also strip NULL characters and other non-printable control characters
+    # except for common whitespace (tab, newline, carriage return)
+    # Control characters are 0x00-0x1F and 0x7F
+    # We keep: 0x09 (tab), 0x0A (newline), 0x0D (carriage return)
+    control_pattern = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
+    result = control_pattern.sub('', result)
+
+    return result
 
 
 # Test cases
@@ -97,6 +111,40 @@ test_cases = [
 
     # Combined attributes
     ("\033[1;4;31mBold underline red\033[0m", "Bold underline red"),
+
+    # NULL characters (new tests for issue #54)
+    ("Hello\x00World", "HelloWorld"),
+    ("\x00\x00\x00Text\x00\x00", "Text"),
+    ("Before\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00After", "BeforeAfter"),
+
+    # Other control characters
+    ("Text\x07here", "Texthere"),  # Bell
+    ("Text\x08here", "Texthere"),  # Backspace
+    ("Text\x0bhere", "Texthere"),  # Vertical tab
+    ("Text\x0chere", "Texthere"),  # Form feed
+    ("Text\x7fhere", "Texthere"),  # Delete
+
+    # Preserve tabs and newlines
+    ("Line1\nLine2", "Line1\nLine2"),
+    ("Col1\tCol2", "Col1\tCol2"),
+    ("Line1\r\nLine2", "Line1\r\nLine2"),
+
+    # Mixed ANSI and control chars
+    ("\x1b[32mGreen\x1b[0m\x00\x00\x00Text\x1b[H\x1b[J", "GreenText"),
+
+    # Complex terminal output similar to issue report
+    (
+        "Starting installation...\n"
+        "\x1b[0;36m╔═══════════════════════════╗\x1b[0m\n"
+        "\x1b[0;36m║\x1b[0m  \x1b[1;37mDomain Config\x1b[0m\n"
+        "\x1b[H\x1b[J"  # Screen clear
+        "\x00\x00\x00\x00\x00\x00\x00\x00"  # NULL characters
+        "\x1b[0;32m✔\x1b[0m Done\n",
+        "Starting installation...\n"
+        "╔═══════════════════════════╗\n"
+        "║  Domain Config\n"
+        "✔ Done\n"
+    ),
 ]
 
 print("Testing strip_ansi_codes function:\n")
