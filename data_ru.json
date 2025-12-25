@@ -1,0 +1,20 @@
+[
+  {
+      "name": "andchir/install_scripts",
+      "script_name": "install-scripts-api-flask",
+      "description": "API для уствновки ПО на удалённый сервер Ubuntu",
+      "info": "Необходимый параметр: доменное имя"
+    },
+    {
+      "name": "andchir/various-useful-api-django",
+      "script_name": "various-useful-api-django",
+      "description": "Набор полезных API с использованием Dkango",
+      "info": "Необходимый параметр: доменное имя"
+    },
+  {
+    "name": "andchir/openchatroulette",
+    "script_name": "openchatroulette",
+      "description": "Видео чат-рулетка",
+      "info": "Необходимый параметр: доменное имя"
+  }
+]
