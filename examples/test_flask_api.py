@@ -13,7 +13,72 @@ import unittest
 # Add the api directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'api'))
 
-from app import app
+from app import app, parse_args
+
+
+class TestParseArgs(unittest.TestCase):
+    """Test cases for command-line argument parsing."""
+
+    def test_parse_args_defaults(self):
+        """Test that default arguments are set correctly."""
+        # Test with empty arguments (default values)
+        import sys
+        original_argv = sys.argv
+        sys.argv = ['app.py']
+        try:
+            args = parse_args()
+            self.assertEqual(args.port, 5000)
+            self.assertEqual(args.host, '0.0.0.0')
+            self.assertTrue(args.debug)
+            self.assertFalse(args.no_debug)
+        finally:
+            sys.argv = original_argv
+
+    def test_parse_args_custom_port(self):
+        """Test that custom port argument is parsed correctly."""
+        import sys
+        original_argv = sys.argv
+        sys.argv = ['app.py', '--port', '8080']
+        try:
+            args = parse_args()
+            self.assertEqual(args.port, 8080)
+        finally:
+            sys.argv = original_argv
+
+    def test_parse_args_custom_host(self):
+        """Test that custom host argument is parsed correctly."""
+        import sys
+        original_argv = sys.argv
+        sys.argv = ['app.py', '--host', '127.0.0.1']
+        try:
+            args = parse_args()
+            self.assertEqual(args.host, '127.0.0.1')
+        finally:
+            sys.argv = original_argv
+
+    def test_parse_args_no_debug(self):
+        """Test that --no-debug argument works correctly."""
+        import sys
+        original_argv = sys.argv
+        sys.argv = ['app.py', '--no-debug']
+        try:
+            args = parse_args()
+            self.assertTrue(args.no_debug)
+        finally:
+            sys.argv = original_argv
+
+    def test_parse_args_combined(self):
+        """Test that multiple arguments can be combined."""
+        import sys
+        original_argv = sys.argv
+        sys.argv = ['app.py', '--port', '3000', '--host', 'localhost', '--no-debug']
+        try:
+            args = parse_args()
+            self.assertEqual(args.port, 3000)
+            self.assertEqual(args.host, 'localhost')
+            self.assertTrue(args.no_debug)
+        finally:
+            sys.argv = original_argv
 
 
 class TestFlaskAPI(unittest.TestCase):
