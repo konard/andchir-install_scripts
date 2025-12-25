@@ -16,5 +16,11 @@
     "script_name": "openchatroulette",
       "description": "Video chat roulette",
       "info": "Required parameter: domain name"
+  },
+  {
+    "name": "pocketbase/pocketbase",
+    "script_name": "pocketbase",
+    "description": "Go backend with built-in SQLite database, authentication, file storage and admin dashboard",
+    "info": "Required parameter: domain name"
   }
 ]

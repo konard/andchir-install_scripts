@@ -16,5 +16,11 @@
     "script_name": "openchatroulette",
       "description": "Видео чат-рулетка",
       "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "pocketbase/pocketbase",
+    "script_name": "pocketbase",
+    "description": "Бэкенд на Go с встроенной базой данных SQLite, аутентификацией, хранилищем файлов и админ-панелью",
+    "info": "Необходимый параметр: доменное имя"
   }
 ]
