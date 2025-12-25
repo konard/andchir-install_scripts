@@ -20,6 +20,7 @@ import logging
 from functools import wraps
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
+from rate_limiter import RateLimiter
 
 # Load environment variables from .env file
 load_dotenv()
@@ -45,8 +46,25 @@ SSH_DEFAULT_TIMEOUT = 30
 # API Key configuration
 API_KEY = os.environ.get('API_KEY', '')
 
+# Protection/Rate Limiting configuration
+PROTECTION_ENABLED = os.environ.get('PROTECTION_ENABLED', 'true').lower() in ('true', '1', 'yes')
+RATE_LIMIT_MAX_REQUESTS = int(os.environ.get('RATE_LIMIT_MAX_REQUESTS', '10'))
+RATE_LIMIT_TIME_WINDOW = int(os.environ.get('RATE_LIMIT_TIME_WINDOW', '60'))
+RATE_LIMITER_DB_PATH = os.environ.get(
+    'RATE_LIMITER_DB_PATH',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'rate_limiter.db')
+)
+
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Initialize rate limiter
+rate_limiter = RateLimiter(
+    db_path=RATE_LIMITER_DB_PATH,
+    max_requests=RATE_LIMIT_MAX_REQUESTS,
+    time_window=RATE_LIMIT_TIME_WINDOW,
+    enabled=PROTECTION_ENABLED
+)
 
 
 def require_api_key(f):
@@ -84,6 +102,61 @@ def require_api_key(f):
                 'success': False,
                 'error': 'Invalid API key'
             }), 401
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def get_client_ip():
+    """
+    Get the real client IP address from the request.
+
+    Handles cases where the API is behind a reverse proxy by checking
+    X-Forwarded-For and X-Real-IP headers first.
+
+    Returns:
+        str: Client IP address
+    """
+    # Check X-Forwarded-For header (set by reverse proxies)
+    if request.headers.get('X-Forwarded-For'):
+        # X-Forwarded-For can contain multiple IPs, take the first one (original client)
+        return request.headers.get('X-Forwarded-For').split(',')[0].strip()
+
+    # Check X-Real-IP header (set by some reverse proxies like nginx)
+    if request.headers.get('X-Real-IP'):
+        return request.headers.get('X-Real-IP')
+
+    # Fall back to direct remote address
+    return request.remote_addr
+
+
+def check_rate_limit(f):
+    """
+    Decorator to check rate limit for the /api/install endpoint.
+
+    Records the request and checks if the IP has exceeded the rate limit.
+    If rate limit is exceeded, returns 429 Too Many Requests.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Skip if protection is disabled
+        if not rate_limiter.enabled:
+            return f(*args, **kwargs)
+
+        client_ip = get_client_ip()
+        endpoint = request.path
+
+        # Check if IP is blocked and record request
+        allowed, count, reason = rate_limiter.record_request(client_ip, endpoint)
+
+        if not allowed:
+            logger.warning(f"Rate limit: IP {client_ip} blocked - {reason}")
+            return jsonify({
+                'success': False,
+                'error': f'Access denied: {reason}',
+                'ip': client_ip,
+                'requests_count': count
+            }), 429
 
         return f(*args, **kwargs)
     return decorated_function
@@ -324,6 +397,7 @@ def execute_script_via_ssh(server_ip, server_root_password, script_name, additio
 
 @app.route('/api/install', methods=['POST'])
 @require_api_key
+@check_rate_limit
 def install():
     """
     Execute an installation script on a remote server via SSH.
@@ -427,6 +501,208 @@ def install():
         }), 500
 
 
+@app.route('/api/protection/status', methods=['GET'])
+@require_api_key
+def protection_status():
+    """
+    Get the current status of the protection/rate limiting system.
+
+    Requires API key authentication if API_KEY is set in environment.
+
+    Returns:
+        JSON response with protection status and configuration.
+    """
+    return jsonify({
+        'success': True,
+        'protection': {
+            'enabled': rate_limiter.enabled,
+            'max_requests': RATE_LIMIT_MAX_REQUESTS,
+            'time_window_seconds': RATE_LIMIT_TIME_WINDOW,
+            'blocked_ips_count': len(rate_limiter.get_blocked_ips()) if rate_limiter.enabled else 0
+        }
+    })
+
+
+@app.route('/api/protection/blocked', methods=['GET'])
+@require_api_key
+def get_blocked_ips():
+    """
+    Get list of all currently blocked IP addresses.
+
+    Requires API key authentication if API_KEY is set in environment.
+
+    Returns:
+        JSON response with list of blocked IPs and their details.
+    """
+    if not rate_limiter.enabled:
+        return jsonify({
+            'success': False,
+            'error': 'Protection mode is disabled',
+            'blocked_ips': []
+        })
+
+    blocked = rate_limiter.get_blocked_ips()
+    return jsonify({
+        'success': True,
+        'count': len(blocked),
+        'blocked_ips': blocked
+    })
+
+
+@app.route('/api/protection/block', methods=['POST'])
+@require_api_key
+def block_ip():
+    """
+    Manually block an IP address.
+
+    Requires API key authentication if API_KEY is set in environment.
+
+    POST Parameters (JSON body):
+        ip: IP address to block (required)
+        reason: Reason for blocking (optional)
+        permanent: Whether to block permanently (optional, default: false)
+        duration_hours: Duration of block in hours (optional, default: 1)
+
+    Returns:
+        JSON response indicating success or failure.
+    """
+    if not rate_limiter.enabled:
+        return jsonify({
+            'success': False,
+            'error': 'Protection mode is disabled'
+        }), 400
+
+    data = request.get_json(silent=True)
+
+    if data is None:
+        return jsonify({
+            'success': False,
+            'error': 'Request body must be JSON'
+        }), 400
+
+    ip_address = data.get('ip')
+
+    if not ip_address:
+        return jsonify({
+            'success': False,
+            'error': 'Missing required field: ip'
+        }), 400
+
+    # Validate IP format
+    ip_pattern = re.compile(r'^(\d{1,3}\.){3}\d{1,3}$')
+    if not ip_pattern.match(ip_address):
+        return jsonify({
+            'success': False,
+            'error': 'Invalid IP address format'
+        }), 400
+
+    reason = data.get('reason', 'Manual block')
+    permanent = data.get('permanent', False)
+    duration_hours = data.get('duration_hours', 1)
+
+    success = rate_limiter.block_ip(
+        ip_address=ip_address,
+        reason=reason,
+        permanent=permanent,
+        duration_hours=duration_hours
+    )
+
+    if success:
+        return jsonify({
+            'success': True,
+            'message': f'IP {ip_address} has been blocked'
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'Failed to block IP'
+        }), 500
+
+
+@app.route('/api/protection/unblock', methods=['POST'])
+@require_api_key
+def unblock_ip():
+    """
+    Unblock an IP address.
+
+    Requires API key authentication if API_KEY is set in environment.
+
+    POST Parameters (JSON body):
+        ip: IP address to unblock (required)
+
+    Returns:
+        JSON response indicating success or failure.
+    """
+    if not rate_limiter.enabled:
+        return jsonify({
+            'success': False,
+            'error': 'Protection mode is disabled'
+        }), 400
+
+    data = request.get_json(silent=True)
+
+    if data is None:
+        return jsonify({
+            'success': False,
+            'error': 'Request body must be JSON'
+        }), 400
+
+    ip_address = data.get('ip')
+
+    if not ip_address:
+        return jsonify({
+            'success': False,
+            'error': 'Missing required field: ip'
+        }), 400
+
+    success = rate_limiter.unblock_ip(ip_address)
+
+    if success:
+        return jsonify({
+            'success': True,
+            'message': f'IP {ip_address} has been unblocked'
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': f'IP {ip_address} was not blocked'
+        }), 404
+
+
+@app.route('/api/protection/stats', methods=['GET'])
+@require_api_key
+def get_request_stats():
+    """
+    Get request statistics.
+
+    Requires API key authentication if API_KEY is set in environment.
+
+    Query Parameters:
+        ip: Optional IP address to filter by
+        limit: Maximum number of records (default: 100)
+
+    Returns:
+        JSON response with request statistics.
+    """
+    if not rate_limiter.enabled:
+        return jsonify({
+            'success': False,
+            'error': 'Protection mode is disabled',
+            'stats': []
+        })
+
+    ip_address = request.args.get('ip')
+    limit = int(request.args.get('limit', 100))
+
+    stats = rate_limiter.get_request_stats(ip_address=ip_address, limit=limit)
+
+    return jsonify({
+        'success': True,
+        'count': len(stats),
+        'stats': stats
+    })
+
+
 @app.route('/health', methods=['GET'])
 @require_api_key
 def health():
@@ -453,13 +729,18 @@ def index():
     """
     return jsonify({
         'name': 'Install Scripts API',
-        'version': '1.0.0',
+        'version': '1.1.0',
         'endpoints': {
             '/': 'API information (this page)',
             '/health': 'Health check endpoint',
             '/api/scripts_list': 'List all available installation scripts (supports ?lang=ru|en)',
             '/api/script/<script_name>': 'Get information about a single script by script_name (supports ?lang=ru|en)',
-            '/api/install': 'Execute an installation script on a remote server via SSH (POST: script_name, server_ip, server_root_password, additional)'
+            '/api/install': 'Execute an installation script on a remote server via SSH (POST: script_name, server_ip, server_root_password, additional)',
+            '/api/protection/status': 'Get protection/rate limiting status and configuration',
+            '/api/protection/blocked': 'List all currently blocked IP addresses',
+            '/api/protection/block': 'Manually block an IP address (POST: ip, reason, permanent, duration_hours)',
+            '/api/protection/unblock': 'Unblock an IP address (POST: ip)',
+            '/api/protection/stats': 'Get request statistics (supports ?ip=x.x.x.x&limit=N)'
         }
     })
 
