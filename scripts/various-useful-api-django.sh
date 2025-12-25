@@ -234,18 +234,25 @@ install_dependencies() {
 }
 
 clone_repository() {
-    print_header "Cloning Repository"
+    print_header "Setting Up Repository"
 
-    if [[ -d "$INSTALL_DIR" ]]; then
-        print_warning "Directory $INSTALL_DIR already exists."
-        print_step "Backing up existing directory..."
-        mv "$INSTALL_DIR" "${INSTALL_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
-        print_success "Backup created"
+    if [[ -d "$INSTALL_DIR/.git" ]]; then
+        print_info "Repository already exists at $INSTALL_DIR"
+        print_step "Pulling latest updates..."
+        su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && git pull" > /dev/null 2>&1
+        print_success "Repository updated successfully"
+    else
+        if [[ -d "$INSTALL_DIR" ]]; then
+            print_warning "Directory $INSTALL_DIR exists but is not a git repository."
+            print_step "Backing up existing directory..."
+            mv "$INSTALL_DIR" "${INSTALL_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
+            print_success "Backup created"
+        fi
+
+        print_step "Cloning repository to $INSTALL_DIR..."
+        su - "$CURRENT_USER" -c "git clone '$REPO_URL' '$INSTALL_DIR'" > /dev/null 2>&1
+        print_success "Repository cloned successfully"
     fi
-
-    print_step "Cloning repository to $INSTALL_DIR..."
-    su - "$CURRENT_USER" -c "git clone '$REPO_URL' '$INSTALL_DIR'" > /dev/null 2>&1
-    print_success "Repository cloned successfully"
 
     cd "$INSTALL_DIR"
     print_info "Working directory: $INSTALL_DIR"
