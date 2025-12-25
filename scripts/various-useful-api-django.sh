@@ -445,6 +445,9 @@ server {
     listen 80;
     server_name $DOMAIN_NAME;
 
+    access_log /var/log/nginx/${DOMAIN_NAME}_access.log;
+    error_log /var/log/nginx/${DOMAIN_NAME}_error.log;
+
     # Redirect HTTP to HTTPS (will be enabled after SSL setup)
     # return 301 https://\$server_name\$request_uri;
 
