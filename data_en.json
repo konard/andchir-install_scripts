@@ -40,5 +40,17 @@
     "script_name": "filebrowser",
     "description": "Web file manager with modern interface and advanced features",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "ngoduykhanh/wireguard-ui",
+    "script_name": "wireguard-wireguard-ui",
+    "description": "WireGuard VPN server with WireGuard-UI web management interface",
+    "info": "Required parameter: domain name"
+  },
+  {
+    "name": "MHSanaei/3x-ui",
+    "script_name": "3x-ui",
+    "description": "Web panel for Xray proxy server management with multi-protocol support",
+    "info": "Required parameter: domain name"
   }
 ]

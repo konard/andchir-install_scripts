@@ -40,5 +40,17 @@
     "script_name": "filebrowser",
     "description": "Веб-файловый менеджер с современным интерфейсом и расширенными возможностями",
     "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "ngoduykhanh/wireguard-ui",
+    "script_name": "wireguard-wireguard-ui",
+    "description": "VPN-сервер WireGuard с веб-интерфейсом WireGuard-UI для управления",
+    "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "MHSanaei/3x-ui",
+    "script_name": "3x-ui",
+    "description": "Веб-панель управления прокси-сервером Xray с поддержкой множества протоколов",
+    "info": "Необходимый параметр: доменное имя"
   }
 ]
