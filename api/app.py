@@ -17,7 +17,12 @@ import re
 import json
 import argparse
 import logging
+from functools import wraps
 from flask import Flask, jsonify, request
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # SSH imports - optional, only required for /api/install endpoint
 try:
@@ -37,8 +42,51 @@ SCRIPTS_BASE_URL = os.environ.get('SCRIPTS_BASE_URL', 'https://raw.githubusercon
 SSH_DEFAULT_PORT = 22
 SSH_DEFAULT_TIMEOUT = 30
 
+# API Key configuration
+API_KEY = os.environ.get('API_KEY', '')
+
 # Configure logging
 logger = logging.getLogger(__name__)
+
+
+def require_api_key(f):
+    """
+    Decorator to require API key authentication for an endpoint.
+
+    The API key can be provided in one of the following ways:
+    - Header: X-API-Key
+    - Query parameter: api_key
+
+    If API_KEY environment variable is not set or empty, authentication is disabled.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # If API_KEY is not set, skip authentication
+        if not API_KEY:
+            return f(*args, **kwargs)
+
+        # Check for API key in header
+        provided_key = request.headers.get('X-API-Key')
+
+        # If not in header, check query parameter
+        if not provided_key:
+            provided_key = request.args.get('api_key')
+
+        # Validate the API key
+        if not provided_key:
+            return jsonify({
+                'success': False,
+                'error': 'API key is required. Provide it via X-API-Key header or api_key query parameter.'
+            }), 401
+
+        if provided_key != API_KEY:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid API key'
+            }), 401
+
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 def get_data_file_path(lang):
@@ -273,9 +321,12 @@ def execute_script_via_ssh(server_ip, server_root_password, script_name, additio
 
 
 @app.route('/api/install', methods=['POST'])
+@require_api_key
 def install():
     """
     Execute an installation script on a remote server via SSH.
+
+    Requires API key authentication if API_KEY is set in environment.
 
     POST Parameters (JSON body):
         script_name: Name of the script to execute (required)

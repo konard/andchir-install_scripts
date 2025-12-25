@@ -51,11 +51,27 @@ python app.py --port 5000 --host 0.0.0.0
 
 ### Переменные окружения
 
+Можно задать переменные окружения в файле `.env` в директории `api/`. Пример файла: `api/.env.example`.
+
 | Переменная | Описание | По умолчанию |
 |------------|----------|--------------|
+| `API_KEY` | API ключ для аутентификации (если не задан, аутентификация отключена) | - |
 | `SCRIPTS_DIR` | Директория со скриптами | `../scripts` |
 | `DATA_DIR` | Директория с файлами данных | `..` |
 | `SCRIPTS_BASE_URL` | Базовый URL для скачивания скриптов | `https://raw.githubusercontent.com/andchir/install_scripts/refs/heads/main/scripts` |
+
+### Аутентификация API
+
+Если переменная окружения `API_KEY` задана, эндпоинт `/api/install` требует API ключ для доступа.
+
+API ключ можно передать:
+- В заголовке `X-API-Key`
+- В параметре запроса `api_key`
+
+**Генерация безопасного ключа:**
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
 ### Эндпоинты API
 
@@ -156,9 +172,12 @@ curl http://localhost:5000/api/script/pocketbase?lang=ru
 
 Запуск установки ПО на удалённом сервере через SSH.
 
+**Требует API ключ для аутентификации**, если переменная `API_KEY` задана.
+
 **Заголовки:**
 ```
 Content-Type: application/json
+X-API-Key: your_api_key (если API_KEY задан)
 ```
 
 **Тело запроса:**
@@ -169,10 +188,11 @@ Content-Type: application/json
 | `server_root_password` | string | Да | Пароль root для SSH |
 | `additional` | string | Нет | Дополнительные параметры для скрипта (например, доменное имя) |
 
-**Пример запроса:**
+**Пример запроса (с API ключом):**
 ```bash
 curl -X POST http://localhost:5000/api/install \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your_api_key" \
   -d '{
     "script_name": "pocketbase",
     "server_ip": "192.168.1.100",
@@ -205,6 +225,7 @@ curl -X POST http://localhost:5000/api/install \
 |-----|----------|
 | 200 | Успешный запрос |
 | 400 | Неверный запрос (отсутствуют обязательные поля) |
+| 401 | Требуется аутентификация (отсутствует или неверный API ключ) |
 | 403 | Доступ запрещён |
 | 404 | Ресурс не найден |
 | 500 | Внутренняя ошибка сервера |

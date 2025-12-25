@@ -51,11 +51,27 @@ python app.py --port 5000 --host 0.0.0.0
 
 ### Environment Variables
 
+You can set environment variables in a `.env` file in the `api/` directory. Example file: `api/.env.example`.
+
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `API_KEY` | API key for authentication (if not set, authentication is disabled) | - |
 | `SCRIPTS_DIR` | Directory with scripts | `../scripts` |
 | `DATA_DIR` | Directory with data files | `..` |
 | `SCRIPTS_BASE_URL` | Base URL for downloading scripts | `https://raw.githubusercontent.com/andchir/install_scripts/refs/heads/main/scripts` |
+
+### API Authentication
+
+If the `API_KEY` environment variable is set, the `/api/install` endpoint requires an API key for access.
+
+The API key can be provided via:
+- Header: `X-API-Key`
+- Query parameter: `api_key`
+
+**Generating a secure key:**
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
 ### API Endpoints
 
@@ -156,9 +172,12 @@ curl http://localhost:5000/api/script/pocketbase?lang=en
 
 Execute software installation on a remote server via SSH.
 
+**Requires API key authentication** if the `API_KEY` variable is set.
+
 **Headers:**
 ```
 Content-Type: application/json
+X-API-Key: your_api_key (if API_KEY is set)
 ```
 
 **Request Body:**
@@ -169,10 +188,11 @@ Content-Type: application/json
 | `server_root_password` | string | Yes | Root password for SSH |
 | `additional` | string | No | Additional parameters for the script (e.g., domain name) |
 
-**Example Request:**
+**Example Request (with API key):**
 ```bash
 curl -X POST http://localhost:5000/api/install \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your_api_key" \
   -d '{
     "script_name": "pocketbase",
     "server_ip": "192.168.1.100",
@@ -205,6 +225,7 @@ curl -X POST http://localhost:5000/api/install \
 |------|-------------|
 | 200 | Successful request |
 | 400 | Bad request (missing required fields) |
+| 401 | Authentication required (missing or invalid API key) |
 | 403 | Access denied |
 | 404 | Resource not found |
 | 500 | Internal server error |
