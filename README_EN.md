@@ -24,7 +24,7 @@ This project provides a set of bash scripts for quick deployment of popular soft
 | `postgresql-mathesar.sh` | PostgreSQL database server with Mathesar web interface |
 | `filebrowser.sh` | Web file manager with modern interface and advanced features |
 | `wireguard-wireguard-ui.sh` | WireGuard VPN server with WireGuard-UI web management interface |
-| `3x-ui.sh` | Web panel for Xray proxy server management with multi-protocol support |
+| `xray-3x-ui.sh` | Xray proxy server with 3x-ui web panel for management (supports VLESS, VMess, Trojan and other protocols) |
 
 ## Usage
 
