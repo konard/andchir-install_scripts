@@ -15,6 +15,7 @@ Arguments:
 import os
 import re
 import json
+import time
 import argparse
 import logging
 import hashlib
@@ -56,6 +57,10 @@ os.makedirs(TASKS_DIR, exist_ok=True)
 TASK_STATUS_PROCESSING = 'processing'
 TASK_STATUS_COMPLETED = 'completed'
 TASK_STATUS_ERROR = 'error'
+
+# Task file cleanup configuration (in seconds)
+# Files older than this will be deleted when /api/install is called
+TASK_FILE_MAX_AGE_SECONDS = int(os.environ.get('TASK_FILE_MAX_AGE_SECONDS', '1800'))  # 30 minutes
 
 # API Key configuration
 API_KEY = os.environ.get('API_KEY', '')
@@ -193,6 +198,57 @@ def delete_task_file(task_id):
     task_file = get_task_file_path(task_id)
     if os.path.exists(task_file):
         os.remove(task_file)
+
+
+def cleanup_old_task_files(max_age_seconds=None):
+    """
+    Delete task files that are older than the specified age.
+
+    This function scans the tasks directory and removes any files
+    that were created more than max_age_seconds ago. This helps
+    prevent accumulation of old task files that may not have been
+    cleaned up properly (e.g., if a client never checked the status).
+
+    Args:
+        max_age_seconds: Maximum age of files to keep (in seconds).
+                        Defaults to TASK_FILE_MAX_AGE_SECONDS.
+
+    Returns:
+        int: Number of files deleted
+    """
+    if max_age_seconds is None:
+        max_age_seconds = TASK_FILE_MAX_AGE_SECONDS
+
+    deleted_count = 0
+    current_time = time.time()
+
+    try:
+        if not os.path.exists(TASKS_DIR):
+            return 0
+
+        for filename in os.listdir(TASKS_DIR):
+            if not filename.endswith('.txt'):
+                continue
+
+            file_path = os.path.join(TASKS_DIR, filename)
+
+            try:
+                # Get file creation/modification time
+                file_mtime = os.path.getmtime(file_path)
+                file_age = current_time - file_mtime
+
+                if file_age > max_age_seconds:
+                    os.remove(file_path)
+                    deleted_count += 1
+                    logger.info(f"Deleted old task file: {filename} (age: {file_age:.0f}s)")
+            except OSError as e:
+                logger.warning(f"Error processing task file {filename}: {str(e)}")
+                continue
+
+    except OSError as e:
+        logger.error(f"Error accessing tasks directory: {str(e)}")
+
+    return deleted_count
 
 
 def require_api_key(f):
@@ -659,6 +715,11 @@ def install():
             'error': 'SSH library (paramiko) is not installed. Please install it with: pip install paramiko',
             'task_id': None
         }), 503
+
+    # Clean up old task files (older than 30 minutes by default)
+    deleted_count = cleanup_old_task_files()
+    if deleted_count > 0:
+        logger.info(f"Cleaned up {deleted_count} old task file(s)")
 
     try:
         # Get JSON data from request
