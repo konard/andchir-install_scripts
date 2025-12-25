@@ -28,5 +28,11 @@
     "script_name": "mysql-phpmyadmin",
     "description": "MySQL database server with phpMyAdmin web interface",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "mathesar-foundation/mathesar",
+    "script_name": "postgresql-mathesar",
+    "description": "PostgreSQL database server with Mathesar web interface",
+    "info": "Required parameter: domain name"
   }
 ]

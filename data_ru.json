@@ -28,5 +28,11 @@
     "script_name": "mysql-phpmyadmin",
     "description": "Сервер базы данных MySQL с веб-интерфейсом phpMyAdmin",
     "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "mathesar-foundation/mathesar",
+    "script_name": "postgresql-mathesar",
+    "description": "Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar",
+    "info": "Необходимый параметр: доменное имя"
   }
 ]
