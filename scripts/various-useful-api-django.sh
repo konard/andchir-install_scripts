@@ -462,6 +462,15 @@ EOF
 configure_nginx() {
     print_header "Configuring Nginx"
 
+    # Check if SSL certificate already exists - if so, skip nginx configuration
+    # to preserve the existing HTTPS configuration created by certbot
+    if [[ -d "/etc/letsencrypt/live/$DOMAIN_NAME" ]]; then
+        print_info "SSL certificate for $DOMAIN_NAME already exists"
+        print_step "Skipping Nginx configuration to preserve existing HTTPS settings..."
+        print_success "Using existing Nginx configuration"
+        return
+    fi
+
     print_step "Creating Nginx configuration..."
 
     tee /etc/nginx/sites-available/$DOMAIN_NAME > /dev/null << EOF
