@@ -34,5 +34,11 @@
     "script_name": "postgresql-mathesar",
     "description": "Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar",
     "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "ngoduykhanh/wireguard-ui",
+    "script_name": "wireguard-wireguard-ui",
+    "description": "VPN-сервер WireGuard с веб-интерфейсом WireGuard-UI для управления",
+    "info": "Необходимый параметр: доменное имя"
   }
 ]

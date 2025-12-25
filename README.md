@@ -22,6 +22,7 @@
 | `pocketbase.sh` | Бэкенд на Go с встроенной базой данных SQLite, аутентификацией, хранилищем файлов и админ-панелью |
 | `mysql-phpmyadmin.sh` | Сервер базы данных MySQL с веб-интерфейсом phpMyAdmin |
 | `postgresql-mathesar.sh` | Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar |
+| `wireguard-wireguard-ui.sh` | VPN-сервер WireGuard с веб-интерфейсом WireGuard-UI для управления |
 
 ## Использование
 
