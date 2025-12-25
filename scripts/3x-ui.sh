@@ -7,12 +7,14 @@
 #
 #   This script automatically installs and configures:
 #   - Git, Curl, Wget, Tar, Nginx, Certbot
+#   - Xray service (from XTLS/Xray-install)
 #   - Downloads and installs 3x-ui panel from GitHub
 #   - Creates systemd services for automatic startup
 #   - Configures Nginx as reverse proxy
 #   - Obtains SSL certificate via Let's Encrypt
 #
-#   Repository: https://github.com/MHSanaei/3x-ui
+#   Xray Repository: https://github.com/XTLS/Xray-install
+#   3x-ui Repository: https://github.com/MHSanaei/3x-ui
 #
 #===============================================================================
 
@@ -195,7 +197,8 @@ show_banner() {
     echo -e "${CYAN}   ║${NC}   ${MAGENTA}Automated Installation Script for Ubuntu 24.04${NC}                         ${CYAN}║${NC}"
     echo -e "${CYAN}   ║${NC}                                                                           ${CYAN}║${NC}"
     echo -e "${CYAN}   ║${NC}   ${WHITE}This script will install and configure:${NC}                                ${CYAN}║${NC}"
-    echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} 3x-ui panel for managing VPN/proxy protocols                          ${CYAN}║${NC}"
+    echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} Xray service for VPN/proxy protocols                                  ${CYAN}║${NC}"
+    echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} 3x-ui panel for managing Xray                                         ${CYAN}║${NC}"
     echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} Nginx as reverse proxy                                                ${CYAN}║${NC}"
     echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} Systemd services for auto-start                                       ${CYAN}║${NC}"
     echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} SSL certificate via Let's Encrypt                                     ${CYAN}║${NC}"
@@ -255,6 +258,84 @@ install_dependencies() {
     print_success "Certbot installed"
 
     print_success "All system dependencies installed successfully!"
+}
+
+install_xray() {
+    print_header "Installing Xray Service"
+
+    # Check if xray is already installed
+    if command -v xray &> /dev/null; then
+        local CURRENT_XRAY_VERSION
+        CURRENT_XRAY_VERSION=$(xray version 2>/dev/null | head -n1 | awk '{print $2}' || echo "unknown")
+        print_info "Xray is already installed (version: $CURRENT_XRAY_VERSION)"
+        print_step "Checking for updates..."
+    else
+        print_step "Installing Xray for the first time..."
+    fi
+
+    # Download and run the official Xray installation script
+    # Using the official installer from XTLS/Xray-install
+    print_step "Downloading Xray installer..."
+    local XRAY_INSTALLER="/tmp/xray-install.sh"
+
+    if ! curl -sL -o "$XRAY_INSTALLER" "https://github.com/XTLS/Xray-install/raw/main/install-release.sh"; then
+        print_error "Failed to download Xray installer"
+        exit 1
+    fi
+
+    chmod +x "$XRAY_INSTALLER"
+    print_success "Xray installer downloaded"
+
+    print_step "Running Xray installer..."
+    # Run the installer - it will install or update xray
+    if bash "$XRAY_INSTALLER" install > /dev/null 2>&1; then
+        print_success "Xray installed/updated successfully"
+    else
+        print_error "Xray installation failed"
+        exit 1
+    fi
+
+    # Clean up installer
+    rm -f "$XRAY_INSTALLER"
+
+    # Verify xray is installed
+    if command -v xray &> /dev/null; then
+        local XRAY_VERSION
+        XRAY_VERSION=$(xray version 2>/dev/null | head -n1 | awk '{print $2}' || echo "unknown")
+        print_success "Xray version: $XRAY_VERSION"
+    else
+        print_warning "Xray command not found, but installation may still be successful"
+    fi
+
+    # Enable and start xray service
+    print_step "Enabling xray service..."
+    systemctl daemon-reload
+    systemctl enable xray > /dev/null 2>&1 || true
+    print_success "Xray service enabled"
+
+    # Start or restart xray service
+    if systemctl is-active --quiet xray; then
+        print_step "Xray service already running, restarting..."
+        systemctl restart xray
+        print_success "Xray service restarted"
+    else
+        print_step "Starting xray service..."
+        systemctl start xray || true
+        print_success "Xray service started"
+    fi
+
+    # Wait briefly for service to start
+    sleep 2
+
+    # Verify xray service status
+    if systemctl is-active --quiet xray; then
+        print_success "Xray service is running"
+    else
+        print_warning "Xray service may not be running. Check: systemctl status xray"
+        print_info "Note: This is expected if no configuration exists yet"
+    fi
+
+    print_success "Xray installation completed!"
 }
 
 download_and_install_xui() {
@@ -619,7 +700,13 @@ show_completion_message() {
     echo -e "  ${CYAN}•${NC} Credentials:   ${BOLD}$HOME_DIR/.3x-ui-credentials${NC}"
     echo ""
 
-    echo -e "${WHITE}Service Management:${NC}"
+    echo -e "${WHITE}Xray Service Management:${NC}"
+    echo -e "  ${CYAN}•${NC} Check status:  ${BOLD}sudo systemctl status xray${NC}"
+    echo -e "  ${CYAN}•${NC} Restart:       ${BOLD}sudo systemctl restart xray${NC}"
+    echo -e "  ${CYAN}•${NC} View logs:     ${BOLD}sudo journalctl -u xray${NC}"
+    echo ""
+
+    echo -e "${WHITE}3x-ui Panel Management:${NC}"
     echo -e "  ${CYAN}•${NC} Check status:  ${BOLD}sudo systemctl status x-ui${NC}"
     echo -e "  ${CYAN}•${NC} Restart:       ${BOLD}sudo systemctl restart x-ui${NC}"
     echo -e "  ${CYAN}•${NC} View logs:     ${BOLD}sudo journalctl -u x-ui${NC}"
@@ -679,6 +766,7 @@ main() {
 
     # Execute installation steps
     install_dependencies
+    install_xray
     download_and_install_xui
     configure_xui_settings
     add_user_to_www_data
