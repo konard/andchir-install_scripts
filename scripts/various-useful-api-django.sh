@@ -312,6 +312,22 @@ configure_mysql() {
 create_env_file() {
     print_header "Creating Environment Configuration"
 
+    # Check if .env file already exists
+    if [[ -f "$INSTALL_DIR/.env" ]]; then
+        print_info ".env file already exists at $INSTALL_DIR/.env"
+        print_step "Skipping .env file creation to preserve existing configuration..."
+        print_success "Using existing .env file"
+
+        # Read existing database credentials from .env for later use
+        if [[ -f "$INSTALL_DIR/.env" ]]; then
+            DB_NAME=$(grep "^MYSQL_DATABASE_NAME=" "$INSTALL_DIR/.env" | cut -d'=' -f2)
+            DB_USER=$(grep "^MYSQL_DATABASE_USER=" "$INSTALL_DIR/.env" | cut -d'=' -f2)
+            DB_PASSWORD=$(grep "^MYSQL_DATABASE_PASSWORD=" "$INSTALL_DIR/.env" | cut -d'=' -f2)
+            export DB_NAME DB_USER DB_PASSWORD
+        fi
+        return
+    fi
+
     DJANGO_SECRET_KEY=$(generate_secret_key)
 
     print_step "Creating .env file..."
@@ -360,10 +376,18 @@ run_django_setup() {
     su - "$CURRENT_USER" -c "mkdir -p '$INSTALL_DIR/media/video' && chmod 755 '$INSTALL_DIR/media/video'"
     print_success "Media directories created"
 
-    print_step "Creating superuser (admin)..."
-    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && DJANGO_SUPERUSER_PASSWORD=admin python manage.py createsuperuser --username=admin --email=admin@user.com --noinput" > /dev/null 2>&1
-    print_success "Superuser created (username: admin, email: admin@user.com)"
-    print_warning "Default password is 'admin' - please change it after first login!"
+    # Check if superuser already exists before creating
+    print_step "Checking for existing superuser..."
+    if su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && python manage.py shell -c \"from django.contrib.auth import get_user_model; User = get_user_model(); print(User.objects.filter(username='admin').exists())\"" 2>/dev/null | grep -q "True"; then
+        print_info "Superuser 'admin' already exists"
+        print_step "Skipping superuser creation..."
+        print_success "Using existing superuser"
+    else
+        print_step "Creating superuser (admin)..."
+        su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && DJANGO_SUPERUSER_PASSWORD=admin python manage.py createsuperuser --username=admin --email=admin@user.com --noinput" > /dev/null 2>&1
+        print_success "Superuser created (username: admin, email: admin@user.com)"
+        print_warning "Default password is 'admin' - please change it after first login!"
+    fi
 
     print_success "Django setup completed"
 }
@@ -498,6 +522,20 @@ EOF
 
 setup_ssl_certificate() {
     print_header "Setting Up SSL Certificate"
+
+    # Check if SSL certificate already exists
+    if [[ -d "/etc/letsencrypt/live/$DOMAIN_NAME" ]]; then
+        print_info "SSL certificate for $DOMAIN_NAME already exists"
+        print_step "Skipping certificate creation..."
+        print_success "Using existing SSL certificate"
+
+        # Make sure certbot timer is enabled for renewals
+        print_step "Ensuring automatic renewal is enabled..."
+        systemctl enable certbot.timer > /dev/null 2>&1
+        systemctl start certbot.timer
+        print_success "Automatic certificate renewal enabled"
+        return
+    fi
 
     print_info "Obtaining SSL certificate from Let's Encrypt..."
     print_info "Make sure DNS is properly configured and pointing to this server."

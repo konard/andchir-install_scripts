@@ -269,6 +269,14 @@ setup_python_environment() {
 create_env_file() {
     print_header "Creating Environment Configuration"
 
+    # Check if .env file already exists
+    if [[ -f "$API_DIR/.env" ]]; then
+        print_info ".env file already exists at $API_DIR/.env"
+        print_step "Skipping .env file creation to preserve existing configuration..."
+        print_success "Using existing .env file"
+        return
+    fi
+
     print_step "Creating .env file..."
 
     # Create .env file for Flask
@@ -401,6 +409,20 @@ EOF
 
 setup_ssl_certificate() {
     print_header "Setting Up SSL Certificate"
+
+    # Check if SSL certificate already exists
+    if [[ -d "/etc/letsencrypt/live/$DOMAIN_NAME" ]]; then
+        print_info "SSL certificate for $DOMAIN_NAME already exists"
+        print_step "Skipping certificate creation..."
+        print_success "Using existing SSL certificate"
+
+        # Make sure certbot timer is enabled for renewals
+        print_step "Ensuring automatic renewal is enabled..."
+        systemctl enable certbot.timer > /dev/null 2>&1
+        systemctl start certbot.timer
+        print_success "Automatic certificate renewal enabled"
+        return
+    fi
 
     print_info "Obtaining SSL certificate from Let's Encrypt..."
     print_info "Make sure DNS is properly configured and pointing to this server."
