@@ -401,7 +401,7 @@ server {
     # return 301 https://\$server_name\$request_uri;
 
     location / {
-        root $FRONTEND_DIR/dist/openchatroulette/browser;
+        root $FRONTEND_DIR/dist/openchatroulette;
         index index.html;
         try_files \$uri \$uri/ /index.html;
     }
