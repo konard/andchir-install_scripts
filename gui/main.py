@@ -321,12 +321,13 @@ class MainWindow(QMainWindow):
 
         software_layout.addWidget(self.software_combo)
 
-        # Description label that updates when selection changes
+        # Description label that updates when selection changes (2 lines height)
         self.description_label = QLabel()
         self.description_label.setWordWrap(True)
-        self.description_label.setMinimumHeight(60)
+        self.description_label.setMinimumHeight(40)
+        self.description_label.setMaximumHeight(50)
         self.description_label.setStyleSheet(
-            "QLabel { background-color: #f5f5f5; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }"
+            "QLabel { background-color: #f5f5f5; padding: 5px; border: 1px solid #ddd; border-radius: 4px; }"
         )
         software_layout.addWidget(self.description_label)
 
@@ -365,6 +366,8 @@ class MainWindow(QMainWindow):
         self.report_text = QTextEdit()
         self.report_text.setReadOnly(True)
         self.report_text.setFont(QFont("Courier New", 10))
+        # Set minimum height for 20 lines (approximately 20 * 18 pixels per line)
+        self.report_text.setMinimumHeight(360)
         report_layout.addWidget(self.report_text)
 
         # Clear button
@@ -374,8 +377,8 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(report_group)
 
-        # Set initial splitter sizes
-        splitter.setSizes([400, 200])
+        # Set initial splitter sizes (smaller input section, larger report section)
+        splitter.setSizes([300, 400])
 
         # Check SSH availability
         if not SSH_AVAILABLE:
