@@ -22,8 +22,8 @@ from typing import Optional
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QTextEdit, QListWidget,
-    QListWidgetItem, QGroupBox, QMessageBox, QSplitter, QFrame
+    QLabel, QLineEdit, QPushButton, QTextEdit, QComboBox,
+    QGroupBox, QMessageBox, QSplitter, QFrame
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QIcon
@@ -306,22 +306,38 @@ class MainWindow(QMainWindow):
         additional_layout.addWidget(self.additional_input)
         top_layout.addLayout(additional_layout)
 
-        # Software list
+        # Software selection
         software_group = QGroupBox(self.tr['software_list'])
         software_layout = QVBoxLayout(software_group)
 
-        self.software_list = QListWidget()
-        self.software_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        # Dropdown (ComboBox) for script selection
+        self.software_combo = QComboBox()
+        self.software_combo.setMinimumHeight(30)
 
-        # Populate software list
+        # Populate software dropdown
         for script in self.scripts:
-            item = QListWidgetItem()
-            item.setText(f"{script.get('name', '')} - {script.get('description', '')}")
-            item.setData(Qt.ItemDataRole.UserRole, script.get('script_name', ''))
-            item.setToolTip(script.get('info', ''))
-            self.software_list.addItem(item)
+            display_text = script.get('name', '')
+            self.software_combo.addItem(display_text, script)
 
-        software_layout.addWidget(self.software_list)
+        software_layout.addWidget(self.software_combo)
+
+        # Description label that updates when selection changes
+        self.description_label = QLabel()
+        self.description_label.setWordWrap(True)
+        self.description_label.setMinimumHeight(60)
+        self.description_label.setStyleSheet(
+            "QLabel { background-color: #f5f5f5; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }"
+        )
+        software_layout.addWidget(self.description_label)
+
+        # Connect selection change signal
+        self.software_combo.currentIndexChanged.connect(self.on_script_selection_changed)
+
+        # Select first item by default and update description
+        if self.scripts:
+            self.software_combo.setCurrentIndex(0)
+            self.on_script_selection_changed(0)
+
         top_layout.addWidget(software_group)
 
         # Buttons
@@ -375,6 +391,22 @@ class MainWindow(QMainWindow):
         octets = ip.split('.')
         return all(0 <= int(octet) <= 255 for octet in octets)
 
+    def on_script_selection_changed(self, index: int):
+        """Handle script selection change in dropdown."""
+        if index < 0 or index >= len(self.scripts):
+            self.description_label.setText("")
+            return
+
+        script = self.software_combo.itemData(index)
+        if script:
+            description = script.get('description', '')
+            info = script.get('info', '')
+            # Format: description on first line, info on second line (if present)
+            if info:
+                self.description_label.setText(f"{description}\n\n{info}")
+            else:
+                self.description_label.setText(description)
+
     def on_install_clicked(self):
         """Handle install button click."""
         # Validate inputs
@@ -392,12 +424,18 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", self.tr['error_no_password'])
             return
 
-        selected_items = self.software_list.selectedItems()
-        if not selected_items:
+        # Get selected script from combo box
+        current_index = self.software_combo.currentIndex()
+        if current_index < 0:
             QMessageBox.warning(self, "Error", self.tr['error_no_script'])
             return
 
-        script_name = selected_items[0].data(Qt.ItemDataRole.UserRole)
+        script = self.software_combo.itemData(current_index)
+        if not script:
+            QMessageBox.warning(self, "Error", self.tr['error_no_script'])
+            return
+
+        script_name = script.get('script_name', '')
         additional = self.additional_input.text().strip()
 
         # Clear previous report
