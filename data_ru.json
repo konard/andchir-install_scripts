@@ -52,5 +52,11 @@
     "script_name": "xray-3x-ui",
     "description": "Xray прокси-сервер с веб-панелью 3x-ui для управления (поддержка VLESS, VMess, Trojan и других протоколов)",
     "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "wordpress/wordpress",
+    "script_name": "wordpress",
+    "description": "CMS WordPress с MySQL, Nginx и SSL-сертификатом",
+    "info": "Необходимые параметры: доменное имя, название сайта (опционально)"
   }
 ]

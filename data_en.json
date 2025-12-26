@@ -52,5 +52,11 @@
     "script_name": "xray-3x-ui",
     "description": "Xray proxy server with 3x-ui web panel for management (supports VLESS, VMess, Trojan and other protocols)",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "wordpress/wordpress",
+    "script_name": "wordpress",
+    "description": "WordPress CMS with MySQL, Nginx and SSL certificate",
+    "info": "Required parameters: domain name, site title (optional)"
   }
 ]
