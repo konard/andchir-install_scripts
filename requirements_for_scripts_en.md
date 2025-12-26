@@ -1,5 +1,6 @@
 - The bash script must be adapted for Ubuntu 24.04.
 - The bash script must create the installer_user user itself and switch to it.
+- The script should install and configure everything necessary, including, for example, a web server, if required.
 - The domain name or other required data must be set through arguments when running the script.
 - The script must create an SSL certificate for the domain using certbot.
 - There should be no additional questions or confirmations.
