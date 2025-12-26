@@ -41,12 +41,13 @@ except ImportError:
 SCRIPTS_BASE_URL = 'https://raw.githubusercontent.com/andchir/install_scripts/refs/heads/main/scripts'
 SSH_DEFAULT_PORT = 22
 SSH_DEFAULT_TIMEOUT = 30
-DEFAULT_LANG = 'ru'
+DEFAULT_LANG = 'en'
 
 # Translations
 TRANSLATIONS = {
     'ru': {
         'window_title': 'Install Scripts - Установка ПО',
+        'language_label': 'Язык:',
         'server_ip': 'IP адрес сервера:',
         'server_password': 'SSH root пароль сервера:',
         'additional_info': 'Дополнительная информация (например, домен):',
@@ -68,6 +69,7 @@ TRANSLATIONS = {
     },
     'en': {
         'window_title': 'Install Scripts - Software Installation',
+        'language_label': 'Language:',
         'server_ip': 'Server IP address:',
         'server_password': 'SSH root password:',
         'additional_info': 'Additional information (e.g., domain):',
@@ -268,6 +270,21 @@ class MainWindow(QMainWindow):
         # Main layout with splitter
         main_layout = QVBoxLayout(central_widget)
 
+        # Language selector at the top right
+        lang_layout = QHBoxLayout()
+        lang_layout.addStretch()
+        self.lang_label = QLabel(self.tr['language_label'])
+        self.lang_combo = QComboBox()
+        self.lang_combo.addItem('English', 'en')
+        self.lang_combo.addItem('Русский', 'ru')
+        # Set current language
+        current_index = 0 if self.lang == 'en' else 1
+        self.lang_combo.setCurrentIndex(current_index)
+        self.lang_combo.currentIndexChanged.connect(self.on_language_changed)
+        lang_layout.addWidget(self.lang_label)
+        lang_layout.addWidget(self.lang_combo)
+        main_layout.addLayout(lang_layout)
+
         splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(splitter)
 
@@ -278,37 +295,37 @@ class MainWindow(QMainWindow):
 
         # Server IP
         ip_layout = QHBoxLayout()
-        ip_label = QLabel(self.tr['server_ip'])
-        ip_label.setMinimumWidth(250)
+        self.ip_label = QLabel(self.tr['server_ip'])
+        self.ip_label.setMinimumWidth(250)
         self.ip_input = QLineEdit()
         self.ip_input.setPlaceholderText("192.168.1.100")
-        ip_layout.addWidget(ip_label)
+        ip_layout.addWidget(self.ip_label)
         ip_layout.addWidget(self.ip_input)
         top_layout.addLayout(ip_layout)
 
         # Server Password
         password_layout = QHBoxLayout()
-        password_label = QLabel(self.tr['server_password'])
-        password_label.setMinimumWidth(250)
+        self.password_label = QLabel(self.tr['server_password'])
+        self.password_label.setMinimumWidth(250)
         self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        password_layout.addWidget(password_label)
+        password_layout.addWidget(self.password_label)
         password_layout.addWidget(self.password_input)
         top_layout.addLayout(password_layout)
 
         # Additional info
         additional_layout = QHBoxLayout()
-        additional_label = QLabel(self.tr['additional_info'])
-        additional_label.setMinimumWidth(250)
+        self.additional_label = QLabel(self.tr['additional_info'])
+        self.additional_label.setMinimumWidth(250)
         self.additional_input = QLineEdit()
         self.additional_input.setPlaceholderText("example.com")
-        additional_layout.addWidget(additional_label)
+        additional_layout.addWidget(self.additional_label)
         additional_layout.addWidget(self.additional_input)
         top_layout.addLayout(additional_layout)
 
         # Software selection
-        software_group = QGroupBox(self.tr['software_list'])
-        software_layout = QVBoxLayout(software_group)
+        self.software_group = QGroupBox(self.tr['software_list'])
+        software_layout = QVBoxLayout(self.software_group)
 
         # Dropdown (ComboBox) for script selection
         self.software_combo = QComboBox()
@@ -339,7 +356,7 @@ class MainWindow(QMainWindow):
             self.software_combo.setCurrentIndex(0)
             self.on_script_selection_changed(0)
 
-        top_layout.addWidget(software_group)
+        top_layout.addWidget(self.software_group)
 
         # Buttons
         button_layout = QHBoxLayout()
@@ -360,8 +377,8 @@ class MainWindow(QMainWindow):
         splitter.addWidget(top_widget)
 
         # Bottom section - Report
-        report_group = QGroupBox(self.tr['report_title'])
-        report_layout = QVBoxLayout(report_group)
+        self.report_group = QGroupBox(self.tr['report_title'])
+        report_layout = QVBoxLayout(self.report_group)
 
         self.report_text = QTextEdit()
         self.report_text.setReadOnly(True)
@@ -371,11 +388,11 @@ class MainWindow(QMainWindow):
         report_layout.addWidget(self.report_text)
 
         # Clear button
-        clear_button = QPushButton(self.tr['clear_button'])
-        clear_button.clicked.connect(self.clear_report)
-        report_layout.addWidget(clear_button)
+        self.clear_button = QPushButton(self.tr['clear_button'])
+        self.clear_button.clicked.connect(self.clear_report)
+        report_layout.addWidget(self.clear_button)
 
-        splitter.addWidget(report_group)
+        splitter.addWidget(self.report_group)
 
         # Set initial splitter sizes (smaller input section, larger report section)
         splitter.setSizes([300, 400])
@@ -490,6 +507,62 @@ class MainWindow(QMainWindow):
     def clear_report(self):
         """Clear the report text."""
         self.report_text.clear()
+
+    def on_language_changed(self, index: int):
+        """Handle language selection change."""
+        new_lang = self.lang_combo.itemData(index)
+        if new_lang == self.lang:
+            return
+
+        # Update language
+        self.lang = new_lang
+        self.tr = TRANSLATIONS.get(new_lang, TRANSLATIONS[DEFAULT_LANG])
+
+        # Reload scripts for the new language
+        self.scripts = load_scripts(new_lang)
+
+        # Update all UI text elements
+        self.update_ui_text()
+
+    def update_ui_text(self):
+        """Update all UI text elements with current language."""
+        # Window title
+        self.setWindowTitle(self.tr['window_title'])
+
+        # Language label
+        self.lang_label.setText(self.tr['language_label'])
+
+        # Input labels
+        self.ip_label.setText(self.tr['server_ip'])
+        self.password_label.setText(self.tr['server_password'])
+        self.additional_label.setText(self.tr['additional_info'])
+
+        # Software group box
+        self.software_group.setTitle(self.tr['software_list'])
+
+        # Update software combo box with scripts in new language
+        current_selection = self.software_combo.currentIndex()
+        self.software_combo.clear()
+        for script in self.scripts:
+            display_text = script.get('name', '')
+            self.software_combo.addItem(display_text, script)
+
+        # Restore selection if possible
+        if 0 <= current_selection < len(self.scripts):
+            self.software_combo.setCurrentIndex(current_selection)
+        elif self.scripts:
+            self.software_combo.setCurrentIndex(0)
+
+        # Update description
+        self.on_script_selection_changed(self.software_combo.currentIndex())
+
+        # Update buttons
+        self.install_button.setText(self.tr['install_button'])
+        self.stop_button.setText(self.tr['stop_button'])
+        self.clear_button.setText(self.tr['clear_button'])
+
+        # Update report group box
+        self.report_group.setTitle(self.tr['report_title'])
 
     def closeEvent(self, event):
         """Handle window close event."""
