@@ -6,7 +6,7 @@
 - There should be no additional questions or confirmations.
 - When necessary, clone the git repository, and if it already exists in the home directory, then pull updates.
 - Always do `git checkout .` before pull to discard local changes.
-- Scripts must support idempotency.
+- Script must support idempotency.
 - All actions must have checks, for example, if you need to create a database, you need to check if it exists, if it exists, skip it. The script can be run multiple times, on repeated runs the code should be updated, but not the database, etc.
 - If a systemd service already exists, restart should be run for it.
 - If python is used and the virtual environment directory already exists, you should not create a new one, but only update dependencies in this virtual environment.
