@@ -48,7 +48,7 @@
     "info": "Required parameter: domain name"
   },
   {
-    "name": "MHSanaei/3x-ui",
+    "name": "mhsanaei/3x-ui",
     "script_name": "xray-3x-ui",
     "description": "Xray proxy server with 3x-ui web panel for management (supports VLESS, VMess, Trojan and other protocols)",
     "info": "Required parameter: domain name"
