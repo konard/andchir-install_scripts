@@ -2,61 +2,61 @@
   {
       "name": "andchir/install_scripts",
       "script_name": "install-scripts-api-flask",
-      "description": "API for installing software on a remote Ubuntu server",
+      "description": "API for installing software on a remote Ubuntu server. Installs: Git, Python 3, pip, venv, Nginx, Certbot, Flask, Gunicorn, systemd service",
       "info": "Required parameter: domain name"
     },
     {
       "name": "andchir/various-useful-api-django",
       "script_name": "various-useful-api-django",
-      "description": "A collection of useful APIs using Django",
+      "description": "A collection of useful APIs using Django. Installs: Git, Python 3, pip, venv, MySQL, Nginx, Certbot, Django, Gunicorn, FFmpeg, systemd service",
       "info": "Required parameter: domain name"
     },
   {
     "name": "andchir/openchatroulette",
     "script_name": "openchatroulette",
-      "description": "Video chat roulette",
+      "description": "Video chat roulette with WebRTC. Installs: Git, Node.js, npm, Nginx, Certbot, Angular, GeoLite2-Country database, systemd service",
       "info": "Required parameter: domain name"
   },
   {
     "name": "pocketbase/pocketbase",
     "script_name": "pocketbase",
-    "description": "Go backend with built-in SQLite database, authentication, file storage and admin dashboard",
+    "description": "Go backend with built-in SQLite database, authentication, file storage and admin dashboard. Installs: Nginx, Certbot, PocketBase, systemd service",
     "info": "Required parameter: domain name"
   },
   {
     "name": "mysql/phpmyadmin",
     "script_name": "mysql-phpmyadmin",
-    "description": "MySQL database server with phpMyAdmin web interface",
+    "description": "MySQL database server with phpMyAdmin web interface. Installs: Nginx, PHP-FPM with extensions, MySQL Server, phpMyAdmin, Certbot",
     "info": "Required parameter: domain name"
   },
   {
     "name": "mathesar-foundation/mathesar",
     "script_name": "postgresql-mathesar",
-    "description": "PostgreSQL database server with Mathesar web interface",
+    "description": "PostgreSQL database server with Mathesar web interface. Installs: Nginx, Certbot, PostgreSQL 16, Mathesar, systemd service",
     "info": "Required parameter: domain name"
   },
   {
     "name": "gtsteffaniak/filebrowser",
     "script_name": "filebrowser",
-    "description": "Web file manager with modern interface and advanced features",
+    "description": "Web file manager with modern interface and advanced features. Installs: Nginx, Certbot, FileBrowser Quantum, systemd service",
     "info": "Required parameter: domain name"
   },
   {
     "name": "wireguard/wireguard-ui",
     "script_name": "wireguard-wireguard-ui",
-    "description": "WireGuard VPN server with WireGuard-UI web management interface",
+    "description": "WireGuard VPN server with WireGuard-UI web management interface. Installs: WireGuard, WireGuard-UI, Nginx, Certbot, IP forwarding configuration, systemd services",
     "info": "Required parameter: domain name"
   },
   {
     "name": "mhsanaei/xray-3x-ui",
     "script_name": "xray-3x-ui",
-    "description": "Xray proxy server with 3x-ui web panel for management (supports VLESS, VMess, Trojan and other protocols)",
+    "description": "Xray proxy server with 3x-ui web panel for management (supports VLESS, VMess, Trojan and other protocols). Installs: Xray, 3x-ui panel, Nginx, Certbot, systemd services",
     "info": "Required parameter: domain name"
   },
   {
     "name": "wordpress/wordpress",
     "script_name": "wordpress",
-    "description": "WordPress CMS with MySQL, Nginx and SSL certificate",
+    "description": "WordPress CMS with MySQL, Nginx and SSL certificate. Installs: WordPress, MySQL Server, Nginx, PHP-FPM with extensions, Certbot, WP-CLI",
     "info": "Required parameters: domain name, site title (optional)"
   }
 ]

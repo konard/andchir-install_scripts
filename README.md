@@ -14,18 +14,18 @@
 
 ## Доступные скрипты
 
-| Скрипт | Описание |
-|--------|----------|
-| `install-scripts-api-flask.sh` | API для установки ПО на удалённый сервер Ubuntu |
-| `various-useful-api-django.sh` | Набор полезных API с использованием Django |
-| `openchatroulette.sh` | Видео чат-рулетка |
-| `pocketbase.sh` | Бэкенд на Go с встроенной базой данных SQLite, аутентификацией, хранилищем файлов и админ-панелью |
-| `mysql-phpmyadmin.sh` | Сервер базы данных MySQL с веб-интерфейсом phpMyAdmin |
-| `postgresql-mathesar.sh` | Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar |
-| `filebrowser.sh` | Веб-файловый менеджер с современным интерфейсом и расширенными возможностями |
-| `wireguard-wireguard-ui.sh` | VPN-сервер WireGuard с веб-интерфейсом WireGuard-UI для управления |
-| `xray-3x-ui.sh` | Xray прокси-сервер с веб-панелью 3x-ui для управления (поддержка VLESS, VMess, Trojan и других протоколов) |
-| `wordpress.sh` | CMS WordPress с MySQL, Nginx и SSL-сертификатом |
+| Скрипт | Описание | Устанавливаемые компоненты |
+|--------|----------|---------------------------|
+| `install-scripts-api-flask.sh` | API для установки ПО на удалённый сервер Ubuntu | Git, Python 3, pip, venv, Nginx, Certbot, Flask, Gunicorn, systemd-сервис |
+| `various-useful-api-django.sh` | Набор полезных API с использованием Django | Git, Python 3, pip, venv, MySQL, Nginx, Certbot, Django, Gunicorn, FFmpeg, systemd-сервис |
+| `openchatroulette.sh` | Видео чат-рулетка с WebRTC | Git, Node.js, npm, Nginx, Certbot, Angular, база данных GeoLite2-Country, systemd-сервис |
+| `pocketbase.sh` | Бэкенд на Go с встроенной базой данных SQLite, аутентификацией и админ-панелью | Nginx, Certbot, PocketBase, systemd-сервис |
+| `mysql-phpmyadmin.sh` | Сервер базы данных MySQL с веб-интерфейсом phpMyAdmin | Nginx, PHP-FPM с расширениями, MySQL Server, phpMyAdmin, Certbot |
+| `postgresql-mathesar.sh` | Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar | Nginx, Certbot, PostgreSQL 16, Mathesar, systemd-сервис |
+| `filebrowser.sh` | Веб-файловый менеджер с современным интерфейсом | Nginx, Certbot, FileBrowser Quantum, systemd-сервис |
+| `wireguard-wireguard-ui.sh` | VPN-сервер WireGuard с веб-интерфейсом для управления | WireGuard, WireGuard-UI, Nginx, Certbot, настройка IP-форвардинга, systemd-сервисы |
+| `xray-3x-ui.sh` | Xray прокси-сервер с веб-панелью 3x-ui (VLESS, VMess, Trojan) | Xray, панель 3x-ui, Nginx, Certbot, systemd-сервисы |
+| `wordpress.sh` | CMS WordPress с MySQL, Nginx и SSL-сертификатом | WordPress, MySQL Server, Nginx, PHP-FPM с расширениями, Certbot, WP-CLI |
 
 ## Использование
 

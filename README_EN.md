@@ -14,18 +14,18 @@ This project provides a set of bash scripts for quick deployment of popular soft
 
 ## Available Scripts
 
-| Script | Description |
-|--------|-------------|
-| `install-scripts-api-flask.sh` | API for installing software on a remote Ubuntu server |
-| `various-useful-api-django.sh` | A collection of useful APIs using Django |
-| `openchatroulette.sh` | Video chat roulette |
-| `pocketbase.sh` | Go backend with built-in SQLite database, authentication, file storage and admin dashboard |
-| `mysql-phpmyadmin.sh` | MySQL database server with phpMyAdmin web interface |
-| `postgresql-mathesar.sh` | PostgreSQL database server with Mathesar web interface |
-| `filebrowser.sh` | Web file manager with modern interface and advanced features |
-| `wireguard-wireguard-ui.sh` | WireGuard VPN server with WireGuard-UI web management interface |
-| `xray-3x-ui.sh` | Xray proxy server with 3x-ui web panel for management (supports VLESS, VMess, Trojan and other protocols) |
-| `wordpress.sh` | WordPress CMS with MySQL, Nginx and SSL certificate |
+| Script | Description | Installed Components |
+|--------|-------------|---------------------|
+| `install-scripts-api-flask.sh` | API for installing software on a remote Ubuntu server | Git, Python 3, pip, venv, Nginx, Certbot, Flask, Gunicorn, systemd service |
+| `various-useful-api-django.sh` | A collection of useful APIs using Django | Git, Python 3, pip, venv, MySQL, Nginx, Certbot, Django, Gunicorn, FFmpeg, systemd service |
+| `openchatroulette.sh` | Video chat roulette with WebRTC | Git, Node.js, npm, Nginx, Certbot, Angular, GeoLite2-Country database, systemd service |
+| `pocketbase.sh` | Go backend with built-in SQLite database, authentication and admin dashboard | Nginx, Certbot, PocketBase, systemd service |
+| `mysql-phpmyadmin.sh` | MySQL database server with phpMyAdmin web interface | Nginx, PHP-FPM with extensions, MySQL Server, phpMyAdmin, Certbot |
+| `postgresql-mathesar.sh` | PostgreSQL database server with Mathesar web interface | Nginx, Certbot, PostgreSQL 16, Mathesar, systemd service |
+| `filebrowser.sh` | Web file manager with modern interface | Nginx, Certbot, FileBrowser Quantum, systemd service |
+| `wireguard-wireguard-ui.sh` | WireGuard VPN server with web management interface | WireGuard, WireGuard-UI, Nginx, Certbot, IP forwarding configuration, systemd services |
+| `xray-3x-ui.sh` | Xray proxy server with 3x-ui web panel (VLESS, VMess, Trojan) | Xray, 3x-ui panel, Nginx, Certbot, systemd services |
+| `wordpress.sh` | WordPress CMS with MySQL, Nginx and SSL certificate | WordPress, MySQL Server, Nginx, PHP-FPM with extensions, Certbot, WP-CLI |
 
 ## Usage
 

@@ -2,61 +2,61 @@
   {
       "name": "andchir/install_scripts",
       "script_name": "install-scripts-api-flask",
-      "description": "API для уствновки ПО на удалённый сервер Ubuntu",
+      "description": "API для установки ПО на удалённый сервер Ubuntu. Устанавливает: Git, Python 3, pip, venv, Nginx, Certbot, Flask, Gunicorn, systemd-сервис",
       "info": "Необходимый параметр: доменное имя"
     },
     {
       "name": "andchir/various-useful-api-django",
       "script_name": "various-useful-api-django",
-      "description": "Набор полезных API с использованием Django",
+      "description": "Набор полезных API с использованием Django. Устанавливает: Git, Python 3, pip, venv, MySQL, Nginx, Certbot, Django, Gunicorn, FFmpeg, systemd-сервис",
       "info": "Необходимый параметр: доменное имя"
     },
   {
     "name": "andchir/openchatroulette",
     "script_name": "openchatroulette",
-      "description": "Видео чат-рулетка",
+      "description": "Видео чат-рулетка с WebRTC. Устанавливает: Git, Node.js, npm, Nginx, Certbot, Angular, базу данных GeoLite2-Country, systemd-сервис",
       "info": "Необходимый параметр: доменное имя"
   },
   {
     "name": "pocketbase/pocketbase",
     "script_name": "pocketbase",
-    "description": "Бэкенд на Go с встроенной базой данных SQLite, аутентификацией, хранилищем файлов и админ-панелью",
+    "description": "Бэкенд на Go с встроенной базой данных SQLite, аутентификацией, хранилищем файлов и админ-панелью. Устанавливает: Nginx, Certbot, PocketBase, systemd-сервис",
     "info": "Необходимый параметр: доменное имя"
   },
   {
     "name": "mysql/phpmyadmin",
     "script_name": "mysql-phpmyadmin",
-    "description": "Сервер базы данных MySQL с веб-интерфейсом phpMyAdmin",
+    "description": "Сервер базы данных MySQL с веб-интерфейсом phpMyAdmin. Устанавливает: Nginx, PHP-FPM с расширениями, MySQL Server, phpMyAdmin, Certbot",
     "info": "Необходимый параметр: доменное имя"
   },
   {
     "name": "mathesar-foundation/mathesar",
     "script_name": "postgresql-mathesar",
-    "description": "Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar",
+    "description": "Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar. Устанавливает: Nginx, Certbot, PostgreSQL 16, Mathesar, systemd-сервис",
     "info": "Необходимый параметр: доменное имя"
   },
   {
     "name": "gtsteffaniak/filebrowser",
     "script_name": "filebrowser",
-    "description": "Веб-файловый менеджер с современным интерфейсом и расширенными возможностями",
+    "description": "Веб-файловый менеджер с современным интерфейсом и расширенными возможностями. Устанавливает: Nginx, Certbot, FileBrowser Quantum, systemd-сервис",
     "info": "Необходимый параметр: доменное имя"
   },
   {
     "name": "wireguard/wireguard-ui",
     "script_name": "wireguard-wireguard-ui",
-    "description": "VPN-сервер WireGuard с веб-интерфейсом WireGuard-UI для управления",
+    "description": "VPN-сервер WireGuard с веб-интерфейсом WireGuard-UI для управления. Устанавливает: WireGuard, WireGuard-UI, Nginx, Certbot, настройку IP-форвардинга, systemd-сервисы",
     "info": "Необходимый параметр: доменное имя"
   },
   {
     "name": "mhsanaei/xray-3x-ui",
     "script_name": "xray-3x-ui",
-    "description": "Xray прокси-сервер с веб-панелью 3x-ui для управления (поддержка VLESS, VMess, Trojan и других протоколов)",
+    "description": "Xray прокси-сервер с веб-панелью 3x-ui для управления (поддержка VLESS, VMess, Trojan и других протоколов). Устанавливает: Xray, панель 3x-ui, Nginx, Certbot, systemd-сервисы",
     "info": "Необходимый параметр: доменное имя"
   },
   {
     "name": "wordpress/wordpress",
     "script_name": "wordpress",
-    "description": "CMS WordPress с MySQL, Nginx и SSL-сертификатом",
+    "description": "CMS WordPress с MySQL, Nginx и SSL-сертификатом. Устанавливает: WordPress, MySQL Server, Nginx, PHP-FPM с расширениями, Certbot, WP-CLI",
     "info": "Необходимые параметры: доменное имя, название сайта (опционально)"
   }
 ]
