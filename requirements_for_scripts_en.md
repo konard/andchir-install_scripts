@@ -10,6 +10,7 @@
 - All actions must have checks, for example, if you need to create a database, you need to check if it exists, if it exists, skip it. The script can be run multiple times, on repeated runs the code should be updated, but not the database, etc.
 - If a systemd service already exists, restart should be run for it.
 - If python is used and the virtual environment directory already exists, you should not create a new one, but only update dependencies in this virtual environment.
+- If you need to create a database for a specific piece of software, never use the root password and user, create a new user and a new password if you don't have one yet.
 - In the nginx configuration, always specify that separate log files should be created for the domain.
 - If an SSL certificate has already been created, it should not be recreated and the nginx configuration should not be updated.
 - All passwords that the script creates must be secure. They need to be written in the report.
