@@ -338,14 +338,16 @@ class MainWindow(QMainWindow):
 
         software_layout.addWidget(self.software_combo)
 
-        # Description label that updates when selection changes (2 lines height)
-        self.description_label = QLabel()
-        self.description_label.setWordWrap(True)
-        self.description_label.setMinimumHeight(40)
-        self.description_label.setMaximumHeight(50)
+        # Description text area that updates when selection changes (~3 lines height with scrolling)
+        self.description_label = QTextEdit()
+        self.description_label.setReadOnly(True)
+        self.description_label.setMinimumHeight(70)
+        self.description_label.setMaximumHeight(80)
         self.description_label.setStyleSheet(
-            "QLabel { background-color: #f5f5f5; padding: 5px; border: 1px solid #ddd; border-radius: 4px; }"
+            "QTextEdit { background-color: #f5f5f5; padding: 5px; border: 1px solid #ddd; border-radius: 4px; }"
         )
+        self.description_label.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.description_label.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         software_layout.addWidget(self.description_label)
 
         # Connect selection change signal
@@ -414,7 +416,7 @@ class MainWindow(QMainWindow):
     def on_script_selection_changed(self, index: int):
         """Handle script selection change in dropdown."""
         if index < 0 or index >= len(self.scripts):
-            self.description_label.setText("")
+            self.description_label.setPlainText("")
             return
 
         script = self.software_combo.itemData(index)
@@ -423,9 +425,9 @@ class MainWindow(QMainWindow):
             info = script.get('info', '')
             # Format: description on first line, info on second line (if present)
             if info:
-                self.description_label.setText(f"{description}\n\n{info}")
+                self.description_label.setPlainText(f"{description}\n\n{info}")
             else:
-                self.description_label.setText(description)
+                self.description_label.setPlainText(description)
 
     def on_install_clicked(self):
         """Handle install button click."""
