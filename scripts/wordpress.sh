@@ -282,13 +282,17 @@ configure_mysql() {
         USER_EXISTS=$(mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$DB_USER' AND host = 'localhost');")
         if [[ "$USER_EXISTS" == "1" ]]; then
             print_info "Database user '$DB_USER' already exists"
-            print_step "Updating user password..."
-            mysql -e "ALTER USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
+            print_warning "Existing database user password will NOT be changed to protect existing applications."
+            print_info "If this WordPress installation cannot connect to the database,"
+            print_info "please manually update the password or provide existing credentials."
+            # Note: We don't change the password here to avoid breaking existing applications
+            # that may be using this user. The administrator should provide existing credentials
+            # in the wp-config.php file or credentials file.
         else
             print_step "Creating database user '$DB_USER'..."
             mysql -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
+            print_success "Database user created"
         fi
-        print_success "Database user configured"
 
         print_step "Granting privileges..."
         mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"

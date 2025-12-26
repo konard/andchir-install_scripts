@@ -268,9 +268,11 @@ setup_database() {
     # Check if database user already exists
     if sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'" | grep -q 1; then
         print_info "Database user '$DB_USER' already exists"
-        print_step "Updating password for user '$DB_USER'..."
-        sudo -u postgres psql -c "ALTER USER $DB_USER WITH ENCRYPTED PASSWORD '$DB_PASSWORD';" > /dev/null 2>&1
-        print_success "Password updated for user '$DB_USER'"
+        print_warning "Existing database user password will NOT be changed to protect existing applications."
+        print_info "If Mathesar cannot connect to the database,"
+        print_info "please manually update the password or provide existing credentials in the .env file."
+        # Note: We don't change the password here to avoid breaking existing applications
+        # that may be using this user.
     else
         print_step "Creating database user '$DB_USER'..."
         sudo -u postgres psql -c "CREATE USER $DB_USER WITH ENCRYPTED PASSWORD '$DB_PASSWORD' CREATEDB;" > /dev/null 2>&1

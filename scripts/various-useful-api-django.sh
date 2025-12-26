@@ -287,23 +287,41 @@ configure_mysql() {
 
     DB_NAME="various_useful_apis"
     DB_USER="various_api_user"
-    DB_PASSWORD=$(generate_password)
 
     print_step "Starting MySQL service..."
     systemctl start mysql
     systemctl enable mysql > /dev/null 2>&1
     print_success "MySQL service started"
 
-    print_step "Creating database and user..."
+    print_step "Checking if database '$DB_NAME' exists..."
+    if mysql -e "USE $DB_NAME" 2>/dev/null; then
+        print_info "Database '$DB_NAME' already exists"
+    else
+        print_step "Creating database '$DB_NAME'..."
+        mysql -e "CREATE DATABASE $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+        print_success "Database created"
+    fi
 
-    # Create database and user
-    mysql -e "CREATE DATABASE IF NOT EXISTS $DB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-    mysql -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
+    print_step "Checking if database user '$DB_USER' exists..."
+    USER_EXISTS=$(mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$DB_USER' AND host = 'localhost');")
+    if [[ "$USER_EXISTS" == "1" ]]; then
+        print_info "Database user '$DB_USER' already exists"
+        print_warning "Existing database user password will NOT be changed to protect existing applications."
+        print_info "If this application cannot connect to the database,"
+        print_info "please manually update the password or provide existing credentials in the .env file."
+        # Generate a placeholder password for the summary - actual connection will use .env file
+        DB_PASSWORD="(existing user - check .env file)"
+    else
+        DB_PASSWORD=$(generate_password)
+        print_step "Creating database user '$DB_USER'..."
+        mysql -e "CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
+        print_success "Database user created"
+    fi
+
+    print_step "Granting privileges..."
     mysql -e "GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';"
     mysql -e "FLUSH PRIVILEGES;"
-
-    print_success "Database '$DB_NAME' created"
-    print_success "User '$DB_USER' created with privileges"
+    print_success "Database privileges granted"
 
     # Save credentials for later use
     export DB_NAME DB_USER DB_PASSWORD
@@ -326,6 +344,20 @@ create_env_file() {
             export DB_NAME DB_USER DB_PASSWORD
         fi
         return
+    fi
+
+    # Check if database user exists but we don't have the password
+    # This can happen if user was created previously but .env was deleted
+    if [[ "$DB_PASSWORD" == "(existing user - check .env file)" ]]; then
+        print_error "Database user '$DB_USER' exists but no .env file found with credentials."
+        print_info "Please manually create $INSTALL_DIR/.env with the correct MYSQL_DATABASE_PASSWORD"
+        print_info "Or reset the database user password in MySQL and create the .env file."
+        print_info ""
+        print_info "Example .env file content:"
+        print_info "  MYSQL_DATABASE_NAME=$DB_NAME"
+        print_info "  MYSQL_DATABASE_USER=$DB_USER"
+        print_info "  MYSQL_DATABASE_PASSWORD=<your_password>"
+        exit 1
     fi
 
     DJANGO_SECRET_KEY=$(generate_secret_key)

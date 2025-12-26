@@ -240,9 +240,25 @@ configure_mysql() {
         PMA_USER="pma_admin"
         PMA_PASSWORD=$(generate_password)
 
-        print_step "Setting MySQL root password..."
-        mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY '$MYSQL_ROOT_PASSWORD';"
-        print_success "MySQL root password set"
+        # Check if MySQL root already has a password set by trying to connect without password
+        print_step "Checking MySQL root password status..."
+        if mysql -u root -e "SELECT 1" > /dev/null 2>&1; then
+            # Root has no password or allows passwordless access, safe to set password
+            print_step "Setting MySQL root password..."
+            mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY '$MYSQL_ROOT_PASSWORD';"
+            print_success "MySQL root password set"
+        else
+            # Root already has a password - cannot proceed without knowing it
+            print_warning "MySQL root password is already set!"
+            print_info "Cannot modify existing MySQL root password."
+            print_info "Please provide existing credentials in: $MYSQL_CREDENTIALS_FILE"
+            print_info "Format:"
+            print_info "  MYSQL_ROOT_PASSWORD=your_root_password"
+            print_info "  PMA_USER=pma_admin"
+            print_info "  PMA_PASSWORD=your_pma_password"
+            print_error "Please create $MYSQL_CREDENTIALS_FILE with existing MySQL credentials and re-run the script."
+            exit 1
+        fi
 
         print_step "Creating phpMyAdmin admin user..."
         mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE USER IF NOT EXISTS '$PMA_USER'@'localhost' IDENTIFIED BY '$PMA_PASSWORD';"
@@ -297,10 +313,26 @@ download_phpmyadmin() {
     unzip -o -q "$TEMP_ZIP" -d /tmp/
     print_success "Extraction completed"
 
+    # Backup existing configuration before removing old installation
+    if [[ -f "$PHPMYADMIN_DIR/config.inc.php" ]]; then
+        print_step "Backing up existing phpMyAdmin configuration..."
+        cp "$PHPMYADMIN_DIR/config.inc.php" /tmp/phpmyadmin_config.inc.php.backup
+        print_success "Configuration backed up"
+    fi
+
     print_step "Installing phpMyAdmin to $PHPMYADMIN_DIR..."
     rm -rf "$PHPMYADMIN_DIR"
     mv "/tmp/phpMyAdmin-${PHPMYADMIN_VERSION}-all-languages" "$PHPMYADMIN_DIR"
     print_success "phpMyAdmin installed"
+
+    # Restore configuration if backup exists
+    if [[ -f /tmp/phpmyadmin_config.inc.php.backup ]]; then
+        print_step "Restoring phpMyAdmin configuration..."
+        mv /tmp/phpmyadmin_config.inc.php.backup "$PHPMYADMIN_DIR/config.inc.php"
+        chown www-data:www-data "$PHPMYADMIN_DIR/config.inc.php"
+        chmod 640 "$PHPMYADMIN_DIR/config.inc.php"
+        print_success "Configuration restored"
+    fi
 
     # Create tmp directory for phpMyAdmin
     print_step "Creating temporary directory for phpMyAdmin..."
