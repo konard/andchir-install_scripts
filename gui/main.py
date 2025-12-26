@@ -23,7 +23,7 @@ from typing import Optional
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QComboBox,
-    QGroupBox, QMessageBox, QSplitter, QFrame
+    QGroupBox, QMessageBox, QSplitter, QFrame, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QIcon, QTextCursor
@@ -267,8 +267,10 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        # Main layout with splitter
+        # Main layout with consistent margins
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
 
         # Language selector at the top right
         lang_layout = QHBoxLayout()
@@ -288,10 +290,34 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(splitter)
 
-        # Top section - Input fields
+        # Top section - Input fields and software selection
         top_widget = QWidget()
         top_layout = QVBoxLayout(top_widget)
-        top_layout.setContentsMargins(10, 10, 10, 10)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(10)
+
+        # Input fields frame (IP, password, additional info)
+        inputs_frame = QFrame()
+        inputs_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        inputs_frame.setStyleSheet("""
+            QFrame {
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QLabel {
+                border: none;
+                background-color: transparent;
+            }
+            QLineEdit {
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                padding: 5px;
+            }
+        """)
+        inputs_layout = QVBoxLayout(inputs_frame)
+        inputs_layout.setContentsMargins(10, 10, 10, 10)
+        inputs_layout.setSpacing(8)
 
         # Server IP
         ip_layout = QHBoxLayout()
@@ -301,7 +327,7 @@ class MainWindow(QMainWindow):
         self.ip_input.setPlaceholderText("192.168.1.100")
         ip_layout.addWidget(self.ip_label)
         ip_layout.addWidget(self.ip_input)
-        top_layout.addLayout(ip_layout)
+        inputs_layout.addLayout(ip_layout)
 
         # Server Password
         password_layout = QHBoxLayout()
@@ -311,7 +337,7 @@ class MainWindow(QMainWindow):
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         password_layout.addWidget(self.password_label)
         password_layout.addWidget(self.password_input)
-        top_layout.addLayout(password_layout)
+        inputs_layout.addLayout(password_layout)
 
         # Additional info
         additional_layout = QHBoxLayout()
@@ -321,11 +347,37 @@ class MainWindow(QMainWindow):
         self.additional_input.setPlaceholderText("example.com")
         additional_layout.addWidget(self.additional_label)
         additional_layout.addWidget(self.additional_input)
-        top_layout.addLayout(additional_layout)
+        inputs_layout.addLayout(additional_layout)
 
-        # Software selection
-        self.software_group = QGroupBox(self.tr['software_list'])
-        software_layout = QVBoxLayout(self.software_group)
+        top_layout.addWidget(inputs_frame)
+
+        # Software selection frame
+        software_frame = QFrame()
+        software_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        software_frame.setStyleSheet("""
+            QFrame {
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QLabel {
+                border: none;
+                background-color: transparent;
+            }
+            QComboBox {
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                padding: 5px;
+            }
+        """)
+        software_inner_layout = QVBoxLayout(software_frame)
+        software_inner_layout.setContentsMargins(10, 10, 10, 10)
+        software_inner_layout.setSpacing(8)
+
+        # Software label
+        self.software_label = QLabel(self.tr['software_list'])
+        self.software_label.setStyleSheet("font-weight: bold; border: none; background-color: transparent;")
+        software_inner_layout.addWidget(self.software_label)
 
         # Dropdown (ComboBox) for script selection
         self.software_combo = QComboBox()
@@ -336,7 +388,7 @@ class MainWindow(QMainWindow):
             display_text = script.get('name', '')
             self.software_combo.addItem(display_text, script)
 
-        software_layout.addWidget(self.software_combo)
+        software_inner_layout.addWidget(self.software_combo)
 
         # Description text area that updates when selection changes (~3 lines height with scrolling)
         self.description_label = QTextEdit()
@@ -348,7 +400,7 @@ class MainWindow(QMainWindow):
         )
         self.description_label.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.description_label.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        software_layout.addWidget(self.description_label)
+        software_inner_layout.addWidget(self.description_label)
 
         # Connect selection change signal
         self.software_combo.currentIndexChanged.connect(self.on_script_selection_changed)
@@ -358,10 +410,11 @@ class MainWindow(QMainWindow):
             self.software_combo.setCurrentIndex(0)
             self.on_script_selection_changed(0)
 
-        top_layout.addWidget(self.software_group)
+        top_layout.addWidget(software_frame)
 
-        # Buttons
+        # Buttons - outside the framed sections
         button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 0, 0, 0)
 
         self.install_button = QPushButton(self.tr['install_button'])
         self.install_button.setMinimumHeight(40)
@@ -379,25 +432,53 @@ class MainWindow(QMainWindow):
         splitter.addWidget(top_widget)
 
         # Bottom section - Report
-        self.report_group = QGroupBox(self.tr['report_title'])
-        report_layout = QVBoxLayout(self.report_group)
+        bottom_widget = QWidget()
+        bottom_layout = QVBoxLayout(bottom_widget)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(10)
+
+        # Report frame
+        report_frame = QFrame()
+        report_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        report_frame.setStyleSheet("""
+            QFrame {
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QLabel {
+                border: none;
+                background-color: transparent;
+            }
+        """)
+        report_inner_layout = QVBoxLayout(report_frame)
+        report_inner_layout.setContentsMargins(10, 10, 10, 10)
+        report_inner_layout.setSpacing(8)
+
+        # Report label
+        self.report_label = QLabel(self.tr['report_title'])
+        self.report_label.setStyleSheet("font-weight: bold; border: none; background-color: transparent;")
+        report_inner_layout.addWidget(self.report_label)
 
         self.report_text = QTextEdit()
         self.report_text.setReadOnly(True)
         self.report_text.setFont(QFont("Courier New", 10))
         # Set minimum height for 20 lines (approximately 20 * 18 pixels per line)
-        self.report_text.setMinimumHeight(360)
-        report_layout.addWidget(self.report_text)
+        self.report_text.setMinimumHeight(200)
+        self.report_text.setStyleSheet("border: 1px solid #ccc; border-radius: 3px;")
+        report_inner_layout.addWidget(self.report_text)
 
-        # Clear button
+        bottom_layout.addWidget(report_frame)
+
+        # Clear button - outside the report frame
         self.clear_button = QPushButton(self.tr['clear_button'])
         self.clear_button.clicked.connect(self.clear_report)
-        report_layout.addWidget(self.clear_button)
+        bottom_layout.addWidget(self.clear_button)
 
-        splitter.addWidget(self.report_group)
+        splitter.addWidget(bottom_widget)
 
         # Set initial splitter sizes (smaller input section, larger report section)
-        splitter.setSizes([300, 400])
+        splitter.setSizes([350, 300])
 
         # Check SSH availability
         if not SSH_AVAILABLE:
@@ -539,8 +620,8 @@ class MainWindow(QMainWindow):
         self.password_label.setText(self.tr['server_password'])
         self.additional_label.setText(self.tr['additional_info'])
 
-        # Software group box
-        self.software_group.setTitle(self.tr['software_list'])
+        # Software label
+        self.software_label.setText(self.tr['software_list'])
 
         # Update software combo box with scripts in new language
         current_selection = self.software_combo.currentIndex()
@@ -563,8 +644,8 @@ class MainWindow(QMainWindow):
         self.stop_button.setText(self.tr['stop_button'])
         self.clear_button.setText(self.tr['clear_button'])
 
-        # Update report group box
-        self.report_group.setTitle(self.tr['report_title'])
+        # Update report label
+        self.report_label.setText(self.tr['report_title'])
 
     def closeEvent(self, event):
         """Handle window close event."""
