@@ -9,8 +9,9 @@
 #   - Git, Curl, Wget, Tar, Nginx, Certbot
 #   - Downloads and installs 3x-ui panel from GitHub (includes bundled Xray)
 #   - Creates systemd services for automatic startup
-#   - Configures Nginx as reverse proxy
+#   - Configures Nginx as reverse proxy for panel and subscription URLs
 #   - Obtains SSL certificate via Let's Encrypt
+#   - Subscription links use HTTPS via nginx (https://domain/sub/... instead of http://domain:2096/sub/...)
 #
 #   Note: 3x-ui includes its own bundled Xray binary. No external Xray service
 #   is needed, which prevents port conflicts with nginx.
@@ -42,6 +43,7 @@ SERVICE_NAME="x-ui"
 INSTALLER_USER="installer_user"
 INSTALL_DIR="/usr/local/x-ui"
 APP_PORT=""  # Will be set dynamically
+SUB_PORT="2096"  # Default subscription server port (3x-ui default)
 
 # These will be set during installation
 CURRENT_USER=""
@@ -567,6 +569,35 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
+    # Subscription service - proxied via nginx for HTTPS support
+    # This allows subscription URLs to use https://domain/sub/... instead of http://domain:2096/sub/...
+    location /sub {
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Forwarded-Host \$http_host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header Range \$http_range;
+        proxy_set_header If-Range \$http_if_range;
+        proxy_redirect off;
+        proxy_pass http://127.0.0.1:$SUB_PORT;
+    }
+
+    # JSON subscription service - also proxied via nginx for HTTPS support
+    location /json {
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Forwarded-Host \$http_host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header Range \$http_range;
+        proxy_set_header If-Range \$http_if_range;
+        proxy_redirect off;
+        proxy_pass http://127.0.0.1:$SUB_PORT;
+    }
+
     client_max_body_size 100M;
 }
 EOF
@@ -679,6 +710,12 @@ show_completion_message() {
     echo -e "  ${CYAN}•${NC} x-ui status       - Current Status"
     echo -e "  ${CYAN}•${NC} x-ui settings     - Current Settings"
     echo -e "  ${CYAN}•${NC} x-ui log          - Check logs"
+    echo ""
+
+    echo -e "${WHITE}Subscription URLs (HTTPS via nginx):${NC}"
+    echo -e "  ${CYAN}•${NC} Base URL:      ${BOLD}https://$DOMAIN_NAME/sub/${NC}"
+    echo -e "  ${CYAN}•${NC} JSON URL:      ${BOLD}https://$DOMAIN_NAME/json/${NC}"
+    echo -e "  ${CYAN}•${NC} Example:       ${BOLD}https://$DOMAIN_NAME/sub/<your-subscription-id>${NC}"
     echo ""
 
     echo -e "${YELLOW}Important:${NC}"
