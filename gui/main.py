@@ -100,18 +100,33 @@ def strip_ansi_codes(text: Optional[str]) -> Optional[str]:
     return ansi_escape.sub('', text)
 
 
+def get_base_path() -> str:
+    """
+    Get the base path for resource files.
+
+    Handles both development mode and PyInstaller frozen executable mode.
+    In frozen mode, PyInstaller extracts files to a temporary directory
+    accessible via sys._MEIPASS.
+    """
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running as a PyInstaller bundle
+        return sys._MEIPASS
+    else:
+        # Running in normal Python environment
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.dirname(script_dir)
+
+
 def get_data_file_path(lang: str) -> str:
     """Get the path to the data file for the specified language."""
-    # Try to find the data file relative to the script location
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(script_dir)
+    base_path = get_base_path()
 
-    data_file = os.path.join(parent_dir, f'data_{lang}.json')
+    data_file = os.path.join(base_path, f'data_{lang}.json')
     if os.path.exists(data_file):
         return data_file
 
     # Fall back to default language
-    default_file = os.path.join(parent_dir, f'data_{DEFAULT_LANG}.json')
+    default_file = os.path.join(base_path, f'data_{DEFAULT_LANG}.json')
     if os.path.exists(default_file):
         return default_file
 

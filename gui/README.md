@@ -101,23 +101,34 @@ python main.py --lang en
 # Установка PyInstaller
 pip install pyinstaller
 
-# Сборка
-pyinstaller --onefile --windowed --name "InstallScripts" main.py
+# Сборка с использованием spec-файла (рекомендуется)
+# Spec-файл автоматически включает файлы данных (data_ru.json, data_en.json)
+cd gui
+pyinstaller InstallScripts.spec
 ```
 
 Исполняемый файл будет создан в директории `dist/`.
 
+> **Важно:** Используйте spec-файл `InstallScripts.spec` для сборки. Он автоматически
+> включает необходимые файлы данных (`data_ru.json`, `data_en.json`) в исполняемый файл.
+> Без этих файлов список скриптов не будет отображаться.
+
 ### Windows (дополнительно)
+
+```powershell
+# Сборка на Windows с использованием spec-файла
+cd gui
+pyinstaller InstallScripts.spec
+```
 
 Для создания установщика можно использовать [Inno Setup](https://jrsoftware.org/isinfo.php) или [NSIS](https://nsis.sourceforge.io/).
 
 ### macOS (создание .app)
 
 ```bash
-# Сборка .app
-pyinstaller --onefile --windowed --name "InstallScripts" \
-    --osx-bundle-identifier "com.andchir.installscripts" \
-    main.py
+# Сборка .app с использованием spec-файла
+cd gui
+pyinstaller InstallScripts.spec
 ```
 
 Для создания DMG-образа можно использовать:
