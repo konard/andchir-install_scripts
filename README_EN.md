@@ -2,6 +2,8 @@
 
 A collection of scripts for automatic installation of various software on remote Ubuntu 24.04 servers.
 
+If the software you need is not available in the list of scripts, you can [create an issue](https://github.com/andchir/install_scripts/issues/new) with a request to add an installation script for it.
+
 ## Project Description
 
 This project provides a set of bash scripts for quick deployment of popular software on Ubuntu servers. All scripts:
