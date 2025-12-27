@@ -18,7 +18,8 @@ import os
 import re
 import json
 import argparse
-from typing import Optional
+import logging
+from typing import Optional, List, Dict, Any
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -36,6 +37,11 @@ except ImportError:
     SSH_AVAILABLE = False
     paramiko = None
 
+
+# Configure logging
+# Enable debug logging via environment variable: INSTALL_SCRIPTS_DEBUG=1
+# or via command line: --debug
+logger = logging.getLogger(__name__)
 
 # Configuration
 SCRIPTS_BASE_URL = 'https://raw.githubusercontent.com/andchir/install_scripts/refs/heads/main/scripts'
@@ -66,6 +72,11 @@ TRANSLATIONS = {
         'status_error': 'Ошибка: {error}',
         'status_stopped': 'Установка прервана пользователем',
         'clear_button': 'Очистить',
+        'error_no_scripts': 'Ошибка: Не удалось загрузить список скриптов.\n\n'
+                           'Если вы собрали исполняемый файл, убедитесь что:\n'
+                           '1. Вы использовали "pyinstaller InstallScripts.spec" для сборки\n'
+                           '2. Файлы данных (data_ru.json, data_en.json) были включены\n\n'
+                           'Для отладки запустите с флагом --debug или установите INSTALL_SCRIPTS_DEBUG=1',
     },
     'en': {
         'window_title': 'Install Scripts - Software Installation',
@@ -88,6 +99,11 @@ TRANSLATIONS = {
         'status_error': 'Error: {error}',
         'status_stopped': 'Installation stopped by user',
         'clear_button': 'Clear',
+        'error_no_scripts': 'Error: Script list could not be loaded.\n\n'
+                           'If you built this as an executable, please ensure:\n'
+                           '1. You used "pyinstaller InstallScripts.spec" to build\n'
+                           '2. The data files (data_ru.json, data_en.json) were included\n\n'
+                           'For debugging, run with --debug flag or set INSTALL_SCRIPTS_DEBUG=1',
     }
 }
 
@@ -110,11 +126,15 @@ def get_base_path() -> str:
     """
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         # Running as a PyInstaller bundle
-        return sys._MEIPASS
+        base_path = sys._MEIPASS
+        logger.debug(f"Running as frozen executable, _MEIPASS={base_path}")
     else:
         # Running in normal Python environment
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.dirname(script_dir)
+        base_path = os.path.dirname(script_dir)
+        logger.debug(f"Running in development mode, base_path={base_path}")
+
+    return base_path
 
 
 def get_data_file_path(lang: str) -> str:
@@ -122,27 +142,64 @@ def get_data_file_path(lang: str) -> str:
     base_path = get_base_path()
 
     data_file = os.path.join(base_path, f'data_{lang}.json')
+    logger.debug(f"Looking for data file: {data_file}")
+
     if os.path.exists(data_file):
+        logger.debug(f"Found data file: {data_file}")
         return data_file
+
+    logger.debug(f"Data file not found: {data_file}")
 
     # Fall back to default language
     default_file = os.path.join(base_path, f'data_{DEFAULT_LANG}.json')
+    logger.debug(f"Trying fallback data file: {default_file}")
+
     if os.path.exists(default_file):
+        logger.debug(f"Found fallback data file: {default_file}")
         return default_file
+
+    logger.warning(f"No data file found for language '{lang}' or default '{DEFAULT_LANG}'")
+
+    # List directory contents for debugging
+    if os.path.exists(base_path):
+        try:
+            contents = os.listdir(base_path)
+            logger.debug(f"Contents of {base_path}: {contents}")
+        except Exception as e:
+            logger.debug(f"Could not list directory contents: {e}")
 
     return ''
 
 
-def load_scripts(lang: str) -> list:
+def load_scripts(lang: str) -> List[Dict[str, Any]]:
     """Load scripts list from the data file."""
+    logger.debug(f"Loading scripts for language: {lang}")
+
     data_file = get_data_file_path(lang)
-    if not data_file or not os.path.exists(data_file):
+    if not data_file:
+        logger.warning(f"No data file path returned for language: {lang}")
+        return []
+
+    if not os.path.exists(data_file):
+        logger.warning(f"Data file does not exist: {data_file}")
         return []
 
     try:
+        logger.debug(f"Opening data file: {data_file}")
         with open(data_file, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
+            content = f.read()
+            logger.debug(f"Read {len(content)} bytes from {data_file}")
+            scripts = json.loads(content)
+            logger.info(f"Loaded {len(scripts)} scripts from {data_file}")
+            return scripts
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parsing error in {data_file}: {e}")
+        return []
+    except IOError as e:
+        logger.error(f"IO error reading {data_file}: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error loading scripts from {data_file}: {e}")
         return []
 
 
@@ -270,6 +327,9 @@ class MainWindow(QMainWindow):
         self.tr = TRANSLATIONS.get(lang, TRANSLATIONS[DEFAULT_LANG])
         self.scripts = load_scripts(lang)
         self.worker = None
+        self._scripts_load_error = len(self.scripts) == 0
+
+        logger.debug(f"MainWindow initialized with {len(self.scripts)} scripts")
 
         self.init_ui()
 
@@ -420,6 +480,10 @@ class MainWindow(QMainWindow):
         if self.scripts:
             self.software_combo.setCurrentIndex(0)
             self.on_script_selection_changed(0)
+        else:
+            # Show error message if no scripts were loaded
+            logger.warning("No scripts available to display in combo box")
+            self.description_label.setPlainText(self.tr.get('error_no_scripts', ''))
 
         columns_splitter.addWidget(software_frame)
 
@@ -683,6 +747,39 @@ class MainWindow(QMainWindow):
             event.accept()
 
 
+def setup_logging(debug: bool = False) -> None:
+    """Configure logging for the application."""
+    # Check for environment variable as well
+    if os.environ.get('INSTALL_SCRIPTS_DEBUG', '').lower() in ('1', 'true', 'yes'):
+        debug = True
+
+    level = logging.DEBUG if debug else logging.WARNING
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+    # Configure root logger
+    logging.basicConfig(level=level, format=log_format)
+
+    # Also log to file if in debug mode
+    if debug:
+        try:
+            # Get a writable directory for the log file
+            if getattr(sys, 'frozen', False):
+                # For frozen executables, use user's home directory
+                log_dir = os.path.expanduser('~')
+            else:
+                # For development, use current directory
+                log_dir = os.getcwd()
+
+            log_file = os.path.join(log_dir, 'install_scripts_debug.log')
+            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(logging.Formatter(log_format))
+            logging.getLogger().addHandler(file_handler)
+            logger.info(f"Debug logging enabled, log file: {log_file}")
+        except Exception as e:
+            logger.warning(f"Could not create log file: {e}")
+
+
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
@@ -695,12 +792,25 @@ def parse_args():
         choices=['ru', 'en'],
         help='Language for the interface (default: ru)'
     )
+    parser.add_argument(
+        '--debug',
+        action='store_true',
+        help='Enable debug logging (also via INSTALL_SCRIPTS_DEBUG=1 env var)'
+    )
     return parser.parse_args()
 
 
 def main():
     """Main entry point."""
     args = parse_args()
+
+    # Setup logging before anything else
+    setup_logging(args.debug)
+
+    logger.info("Starting Install Scripts GUI")
+    logger.debug(f"Python version: {sys.version}")
+    logger.debug(f"sys.frozen: {getattr(sys, 'frozen', False)}")
+    logger.debug(f"sys._MEIPASS: {getattr(sys, '_MEIPASS', 'Not set')}")
 
     app = QApplication(sys.argv)
     app.setApplicationName("Install Scripts GUI")
