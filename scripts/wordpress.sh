@@ -287,6 +287,12 @@ configure_mysql() {
             print_step "Stopping MySQL service..."
             systemctl stop mysql
 
+            # Ensure the socket directory exists (required for mysqld_safe)
+            print_step "Ensuring MySQL socket directory exists..."
+            mkdir -p /var/run/mysqld
+            chown mysql:mysql /var/run/mysqld
+            chmod 755 /var/run/mysqld
+
             print_step "Starting MySQL in recovery mode..."
             # Start MySQL without grant tables (allows access without password)
             mysqld_safe --skip-grant-tables --skip-networking &
