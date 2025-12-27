@@ -550,8 +550,11 @@ setup_wordpress_site() {
     # Check if WordPress is already installed (tables exist)
     print_step "Checking if WordPress is already installed..."
 
-    # Run wp-cli as www-data user
-    if sudo -u www-data "$WP_CLI_PATH" core is-installed --path="$INSTALL_DIR" 2>/dev/null; then
+    # Run wp-cli as www-data user from the WordPress directory
+    # This is required because PHP 8.3+ uses posix_spawn which fails if the
+    # current working directory is not accessible to the target user (www-data).
+    # By using 'cd $INSTALL_DIR && ...' we ensure the CWD is accessible.
+    if sudo -u www-data bash -c "cd '$INSTALL_DIR' && '$WP_CLI_PATH' core is-installed --path='$INSTALL_DIR'" 2>/dev/null; then
         print_info "WordPress is already installed"
         print_step "Skipping WordPress setup..."
         print_success "Using existing WordPress installation"
@@ -559,25 +562,25 @@ setup_wordpress_site() {
     fi
 
     print_step "Running WordPress installation..."
-    sudo -u www-data "$WP_CLI_PATH" core install \
-        --path="$INSTALL_DIR" \
-        --url="https://$DOMAIN_NAME" \
-        --title="$SITE_TITLE" \
-        --admin_user="$WP_ADMIN_USER" \
-        --admin_password="$WP_ADMIN_PASSWORD" \
-        --admin_email="$WP_ADMIN_EMAIL" \
-        --skip-email
+    sudo -u www-data bash -c "cd '$INSTALL_DIR' && '$WP_CLI_PATH' core install \
+        --path='$INSTALL_DIR' \
+        --url='https://$DOMAIN_NAME' \
+        --title='$SITE_TITLE' \
+        --admin_user='$WP_ADMIN_USER' \
+        --admin_password='$WP_ADMIN_PASSWORD' \
+        --admin_email='$WP_ADMIN_EMAIL' \
+        --skip-email"
 
     print_success "WordPress installation completed"
 
     print_step "Setting permalink structure..."
-    sudo -u www-data "$WP_CLI_PATH" rewrite structure '/%postname%/' --path="$INSTALL_DIR"
+    sudo -u www-data bash -c "cd '$INSTALL_DIR' && '$WP_CLI_PATH' rewrite structure '/%postname%/' --path='$INSTALL_DIR'"
     print_success "Permalinks configured"
 
     print_step "Updating WordPress settings..."
-    sudo -u www-data "$WP_CLI_PATH" option update timezone_string 'UTC' --path="$INSTALL_DIR"
-    sudo -u www-data "$WP_CLI_PATH" option update date_format 'Y-m-d' --path="$INSTALL_DIR"
-    sudo -u www-data "$WP_CLI_PATH" option update time_format 'H:i' --path="$INSTALL_DIR"
+    sudo -u www-data bash -c "cd '$INSTALL_DIR' && '$WP_CLI_PATH' option update timezone_string 'UTC' --path='$INSTALL_DIR'"
+    sudo -u www-data bash -c "cd '$INSTALL_DIR' && '$WP_CLI_PATH' option update date_format 'Y-m-d' --path='$INSTALL_DIR'"
+    sudo -u www-data bash -c "cd '$INSTALL_DIR' && '$WP_CLI_PATH' option update time_format 'H:i' --path='$INSTALL_DIR'"
     print_success "WordPress settings updated"
 }
 
