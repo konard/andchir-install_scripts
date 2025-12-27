@@ -290,13 +290,16 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Vertical)
         main_layout.addWidget(splitter)
 
-        # Top section - Input fields and software selection
+        # Top section - Two-column layout: Input fields (left) and software selection (right)
         top_widget = QWidget()
         top_layout = QVBoxLayout(top_widget)
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setSpacing(10)
 
-        # Input fields frame (IP, password, additional info)
+        # Horizontal splitter for two-column layout
+        columns_splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # Left column - Input fields frame (IP, password, additional info)
         inputs_frame = QFrame()
         inputs_frame.setFrameShape(QFrame.Shape.StyledPanel)
         inputs_frame.setStyleSheet("""
@@ -319,39 +322,33 @@ class MainWindow(QMainWindow):
         inputs_layout.setContentsMargins(10, 10, 10, 10)
         inputs_layout.setSpacing(8)
 
-        # Server IP
-        ip_layout = QHBoxLayout()
+        # Server IP - vertical layout (label on top of input)
         self.ip_label = QLabel(self.tr['server_ip'])
-        self.ip_label.setMinimumWidth(250)
+        inputs_layout.addWidget(self.ip_label)
         self.ip_input = QLineEdit()
         self.ip_input.setPlaceholderText("192.168.1.100")
-        ip_layout.addWidget(self.ip_label)
-        ip_layout.addWidget(self.ip_input)
-        inputs_layout.addLayout(ip_layout)
+        inputs_layout.addWidget(self.ip_input)
 
-        # Server Password
-        password_layout = QHBoxLayout()
+        # Server Password - vertical layout (label on top of input)
         self.password_label = QLabel(self.tr['server_password'])
-        self.password_label.setMinimumWidth(250)
+        inputs_layout.addWidget(self.password_label)
         self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        password_layout.addWidget(self.password_label)
-        password_layout.addWidget(self.password_input)
-        inputs_layout.addLayout(password_layout)
+        inputs_layout.addWidget(self.password_input)
 
-        # Additional info
-        additional_layout = QHBoxLayout()
+        # Additional info - vertical layout (label on top of input)
         self.additional_label = QLabel(self.tr['additional_info'])
-        self.additional_label.setMinimumWidth(250)
+        inputs_layout.addWidget(self.additional_label)
         self.additional_input = QLineEdit()
         self.additional_input.setPlaceholderText("example.com")
-        additional_layout.addWidget(self.additional_label)
-        additional_layout.addWidget(self.additional_input)
-        inputs_layout.addLayout(additional_layout)
+        inputs_layout.addWidget(self.additional_input)
 
-        top_layout.addWidget(inputs_frame)
+        # Add spacer to push content to top
+        inputs_layout.addStretch()
 
-        # Software selection frame
+        columns_splitter.addWidget(inputs_frame)
+
+        # Right column - Software selection frame
         software_frame = QFrame()
         software_frame.setFrameShape(QFrame.Shape.StyledPanel)
         software_frame.setStyleSheet("""
@@ -390,11 +387,10 @@ class MainWindow(QMainWindow):
 
         software_inner_layout.addWidget(self.software_combo)
 
-        # Description text area that updates when selection changes (~3 lines height with scrolling)
+        # Description text area that updates when selection changes
         self.description_label = QTextEdit()
         self.description_label.setReadOnly(True)
         self.description_label.setMinimumHeight(70)
-        self.description_label.setMaximumHeight(80)
         self.description_label.setStyleSheet(
             "QTextEdit { background-color: #f5f5f5; padding: 5px; border: 1px solid #ddd; border-radius: 4px; }"
         )
@@ -410,7 +406,12 @@ class MainWindow(QMainWindow):
             self.software_combo.setCurrentIndex(0)
             self.on_script_selection_changed(0)
 
-        top_layout.addWidget(software_frame)
+        columns_splitter.addWidget(software_frame)
+
+        # Set equal column widths
+        columns_splitter.setSizes([400, 400])
+
+        top_layout.addWidget(columns_splitter)
 
         # Buttons - outside the framed sections
         button_layout = QHBoxLayout()
