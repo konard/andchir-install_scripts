@@ -500,10 +500,34 @@ setup_ssl_certificate() {
     print_info "Obtaining SSL certificate from Let's Encrypt..."
     print_info "Make sure DNS is properly configured and pointing to this server."
 
-    print_step "Running Certbot..."
+    # Retry settings for handling transient Let's Encrypt errors
+    # The "No such authorization" error (404 bug) is a known issue caused by
+    # database replication lag at Let's Encrypt. Retrying typically resolves it.
+    # See: https://github.com/certbot/certbot/issues/10184
+    local max_attempts=3
+    local retry_delay=10
+    local attempt=1
+    local certbot_success=false
 
-    # Run certbot with automatic configuration
-    if certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --register-unsafely-without-email --redirect; then
+    while [[ $attempt -le $max_attempts ]]; do
+        print_step "Running Certbot (attempt $attempt of $max_attempts)..."
+
+        # Run certbot with automatic configuration
+        if certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --register-unsafely-without-email --redirect; then
+            certbot_success=true
+            break
+        else
+            if [[ $attempt -lt $max_attempts ]]; then
+                print_warning "Certbot attempt $attempt failed. Retrying in $retry_delay seconds..."
+                sleep $retry_delay
+                # Increase delay for next attempt (exponential backoff)
+                retry_delay=$((retry_delay * 2))
+            fi
+        fi
+        ((attempt++))
+    done
+
+    if [[ "$certbot_success" == true ]]; then
         print_success "SSL certificate obtained and configured"
 
         print_step "Setting up automatic renewal..."
@@ -511,7 +535,7 @@ setup_ssl_certificate() {
         systemctl start certbot.timer
         print_success "Automatic certificate renewal enabled"
     else
-        print_warning "SSL certificate setup failed. You can run it manually later:"
+        print_warning "SSL certificate setup failed after $max_attempts attempts. You can run it manually later:"
         print_info "certbot --nginx -d $DOMAIN_NAME"
     fi
 }
