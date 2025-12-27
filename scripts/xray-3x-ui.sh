@@ -174,12 +174,26 @@ get_architecture() {
 
 get_latest_version() {
     # Get the latest version from GitHub API
+    # Uses timeouts to prevent hanging on network issues
     local version
-    version=$(curl -sL "https://api.github.com/repos/MHSanaei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    local api_url="https://api.github.com/repos/MHSanaei/3x-ui/releases/latest"
+
+    # First try with default settings (may use IPv6)
+    version=$(curl -sL --connect-timeout 10 --max-time 30 "$api_url" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
     if [[ -z "$version" ]]; then
-        # Fallback to IPv4
-        version=$(curl -4 -sL "https://api.github.com/repos/MHSanaei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        # Fallback to IPv4 only (helps when IPv6 is broken)
+        print_info "Trying to fetch version with IPv4..."
+        version=$(curl -4 -sL --connect-timeout 10 --max-time 30 "$api_url" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    fi
+
+    # If still empty, provide a fallback version
+    if [[ -z "$version" ]]; then
+        # Hardcoded fallback - update this periodically
+        local fallback_version="v2.8.5"
+        print_warning "Could not fetch version from GitHub API (may be rate limited)"
+        print_info "Using fallback version: $fallback_version"
+        version="$fallback_version"
     fi
 
     echo "$version"
@@ -300,6 +314,8 @@ download_and_install_xui() {
 
     if [[ -z "$TAG_VERSION" ]]; then
         print_error "Failed to fetch 3x-ui version from GitHub API"
+        print_info "This may be due to network issues or GitHub API rate limiting (60 requests/hour)"
+        print_info "Please try again later or check your network connection"
         exit 1
     fi
 
