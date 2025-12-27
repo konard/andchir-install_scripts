@@ -620,22 +620,51 @@ optimize_php_fpm() {
     print_step "Calculating optimal PHP process settings..."
 
     local PHP_MEM_LIMIT
+    local PHP_MEM_LIMIT_BYTES
     local AVAIL_MEM
+    local AVAIL_MEM_BYTES
     local MAX_PHP_PROCESSES
 
     # Get PHP memory limit (default 128M if not set)
     PHP_MEM_LIMIT=$(php -r "echo ini_get('memory_limit');" 2>/dev/null || echo "128M")
-    # Convert to bytes
-    PHP_MEM_LIMIT_BYTES=$(echo "$PHP_MEM_LIMIT" | numfmt --from=iec 2>/dev/null || echo "134217728")
+
+    # Handle special case when memory_limit is -1 (unlimited)
+    # Also handle empty/invalid values
+    if [[ "$PHP_MEM_LIMIT" == "-1" ]]; then
+        # When memory is unlimited, use a sensible default for calculation (256M)
+        # This is a reasonable assumption for WordPress sites
+        PHP_MEM_LIMIT_BYTES=268435456
+        print_info "PHP memory limit is unlimited (-1), using 256M for calculation"
+    elif [[ -z "$PHP_MEM_LIMIT" ]] || [[ "$PHP_MEM_LIMIT" == "0" ]]; then
+        # Empty or zero memory limit - use default 128M
+        PHP_MEM_LIMIT_BYTES=134217728
+        print_info "PHP memory limit is not set, using default 128M for calculation"
+    else
+        # Try to convert the value using numfmt
+        PHP_MEM_LIMIT_BYTES=$(echo "$PHP_MEM_LIMIT" | numfmt --from=iec 2>/dev/null || echo "")
+
+        # Validate the result is a positive number
+        if [[ -z "$PHP_MEM_LIMIT_BYTES" ]] || ! [[ "$PHP_MEM_LIMIT_BYTES" =~ ^[0-9]+$ ]] || [[ "$PHP_MEM_LIMIT_BYTES" -le 0 ]]; then
+            # Conversion failed or invalid result - use default 128M
+            PHP_MEM_LIMIT_BYTES=134217728
+            print_warning "Could not parse PHP memory limit '$PHP_MEM_LIMIT', using default 128M"
+        fi
+    fi
 
     # Get available memory in bytes
     AVAIL_MEM=$(grep MemAvailable /proc/meminfo | awk '{print $2}')
     AVAIL_MEM_BYTES=$((AVAIL_MEM * 1024))
 
-    # Calculate max processes: available memory / PHP memory limit, with minimum of 5
-    MAX_PHP_PROCESSES=$(echo "${AVAIL_MEM_BYTES}/${PHP_MEM_LIMIT_BYTES}+5" | bc 2>/dev/null || echo "10")
+    # Calculate max processes: available memory / PHP memory limit
+    # Using integer arithmetic to avoid bc dependency issues
+    MAX_PHP_PROCESSES=$((AVAIL_MEM_BYTES / PHP_MEM_LIMIT_BYTES))
 
-    # Cap at reasonable maximum
+    # Ensure minimum of 5 processes
+    if [[ "$MAX_PHP_PROCESSES" -lt 5 ]]; then
+        MAX_PHP_PROCESSES=5
+    fi
+
+    # Cap at reasonable maximum of 50
     if [[ "$MAX_PHP_PROCESSES" -gt 50 ]]; then
         MAX_PHP_PROCESSES=50
     fi
