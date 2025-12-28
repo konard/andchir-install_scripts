@@ -424,12 +424,21 @@ server {
     # Redirect HTTP to HTTPS (will be enabled after SSL setup)
     # return 301 https://\$server_name\$request_uri;
 
-    location / {
-        root $FRONTEND_DIR/dist/openchatroulette;
-        index index.html;
-        try_files \$uri \$uri/ /index.html;
+    root $FRONTEND_DIR/dist/openchatroulette;
+
+    # Default root path redirects to English version
+    location = / {
+        return 302 /en/;
     }
 
+    # Language-specific paths (en, ru, fr, ua)
+    location ~ ^/(en|ru|fr|ua)(/.*)?$ {
+        alias $FRONTEND_DIR/dist/openchatroulette/\$1/;
+        index index.html;
+        try_files \$2 \$2/ /\$1/index.html;
+    }
+
+    # Peer server WebSocket/API proxy
     location /openchatroulette {
         proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_http_version 1.1;
