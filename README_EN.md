@@ -30,6 +30,7 @@ This project provides a set of bash scripts for quick deployment of popular soft
 | `wordpress.sh` | WordPress CMS with MySQL, Nginx and SSL certificate | WordPress, MySQL Server, Nginx, PHP-FPM with extensions, Certbot, WP-CLI |
 | `n8n.sh` | n8n workflow automation platform | Docker, Docker Compose, PostgreSQL 16, n8n, Nginx, Certbot |
 | `rocketchat.sh` | Rocket.Chat messaging platform | Docker, Docker Compose, MongoDB 6.0 with replica set, Rocket.Chat, Nginx, Certbot |
+| `jitsi-meet.sh` | Jitsi Meet video conferencing platform | Prosody XMPP, Jitsi Videobridge, Jicofo, Nginx, Certbot |
 
 ## Usage
 

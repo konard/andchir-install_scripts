@@ -70,5 +70,11 @@
     "script_name": "rocketchat",
     "description": "Rocket.Chat messaging platform with MongoDB. Installs: Docker, Docker Compose, MongoDB 6.0 with replica set, Rocket.Chat, Nginx, Certbot",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "jitsi/jitsi-meet",
+    "script_name": "jitsi-meet",
+    "description": "Jitsi Meet video conferencing platform. Installs: Prosody XMPP, Jitsi Videobridge, Jicofo, Nginx, Certbot",
+    "info": "Required parameter: domain name"
   }
 ]
