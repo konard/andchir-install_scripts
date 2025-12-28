@@ -28,6 +28,8 @@
 | `wireguard-wireguard-ui.sh` | VPN-сервер WireGuard с веб-интерфейсом для управления | WireGuard, WireGuard-UI, Nginx, Certbot, настройка IP-форвардинга, systemd-сервисы |
 | `xray-3x-ui.sh` | Xray прокси-сервер с веб-панелью 3x-ui (VLESS, VMess, Trojan) | Xray, панель 3x-ui, Nginx, Certbot, systemd-сервисы |
 | `wordpress.sh` | CMS WordPress с MySQL, Nginx и SSL-сертификатом | WordPress, MySQL Server, Nginx, PHP-FPM с расширениями, Certbot, WP-CLI |
+| `n8n.sh` | Платформа автоматизации рабочих процессов n8n | Docker, Docker Compose, PostgreSQL 16, n8n, Nginx, Certbot |
+| `rocketchat.sh` | Платформа для обмена сообщениями Rocket.Chat | Docker, Docker Compose, MongoDB 6.0 с replica set, Rocket.Chat, Nginx, Certbot |
 
 ## Использование
 

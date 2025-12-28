@@ -58,5 +58,17 @@
     "script_name": "wordpress",
     "description": "CMS WordPress с MySQL, Nginx и SSL-сертификатом. Устанавливает: WordPress, MySQL Server, Nginx, PHP-FPM с расширениями, Certbot, WP-CLI",
     "info": "Необходимые параметры: доменное имя, название сайта (опционально)"
+  },
+  {
+    "name": "n8n-io/n8n",
+    "script_name": "n8n",
+    "description": "Платформа автоматизации рабочих процессов n8n с PostgreSQL. Устанавливает: Docker, Docker Compose, PostgreSQL 16, n8n, Nginx, Certbot",
+    "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "RocketChat/Rocket.Chat",
+    "script_name": "rocketchat",
+    "description": "Платформа для обмена сообщениями Rocket.Chat с MongoDB. Устанавливает: Docker, Docker Compose, MongoDB 6.0 с replica set, Rocket.Chat, Nginx, Certbot",
+    "info": "Необходимый параметр: доменное имя"
   }
 ]

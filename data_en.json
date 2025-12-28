@@ -58,5 +58,17 @@
     "script_name": "wordpress",
     "description": "WordPress CMS with MySQL, Nginx and SSL certificate. Installs: WordPress, MySQL Server, Nginx, PHP-FPM with extensions, Certbot, WP-CLI",
     "info": "Required parameters: domain name, site title (optional)"
+  },
+  {
+    "name": "n8n-io/n8n",
+    "script_name": "n8n",
+    "description": "n8n workflow automation platform with PostgreSQL. Installs: Docker, Docker Compose, PostgreSQL 16, n8n, Nginx, Certbot",
+    "info": "Required parameter: domain name"
+  },
+  {
+    "name": "RocketChat/Rocket.Chat",
+    "script_name": "rocketchat",
+    "description": "Rocket.Chat messaging platform with MongoDB. Installs: Docker, Docker Compose, MongoDB 6.0 with replica set, Rocket.Chat, Nginx, Certbot",
+    "info": "Required parameter: domain name"
   }
 ]
