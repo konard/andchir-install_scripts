@@ -98,7 +98,7 @@
   {
     "name": "link-assistant/hive-mind",
     "script_name": "hive-mind",
-    "description": "AI-оркестратор Hive Mind с интеграцией Telegram-бота. Устанавливает: Docker, Docker Compose, Hive Mind, Telegram Bot, Nginx, Certbot",
-    "info": "Необходимые параметры: доменное имя, токен Telegram-бота, ID группы Telegram"
+    "description": "AI-оркестратор Hive Mind с интеграцией Telegram-бота. Устанавливает: Docker, Docker Compose, Hive Mind, Telegram Bot",
+    "info": "Необходимые параметры: токен Telegram-бота, ID группы Telegram"
   }
 ]

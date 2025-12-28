@@ -9,8 +9,6 @@
 #   - Docker and Docker Compose
 #   - Hive Mind AI orchestrator (via Docker)
 #   - Telegram Bot integration
-#   - Nginx as reverse proxy
-#   - SSL certificate via Let's Encrypt
 #
 #   Repository: https://github.com/link-assistant/hive-mind
 #   Documentation: https://github.com/link-assistant/hive-mind#readme
@@ -36,9 +34,7 @@ NC='\033[0m' # No Color
 # Configuration variables
 #-------------------------------------------------------------------------------
 APP_NAME="hive-mind"
-SERVICE_NAME="hive-mind"
 INSTALLER_USER="installer_user"
-APP_PORT="3000"
 DOCKER_IMAGE="konard/hive-mind:latest"
 
 # These will be set after user setup
@@ -55,28 +51,17 @@ TELEGRAM_GROUP_ID=""
 #-------------------------------------------------------------------------------
 
 show_usage() {
-    echo "Usage: $0 <domain_name> <telegram_bot_token> <telegram_group_id>"
+    echo "Usage: $0 <telegram_bot_token> <telegram_group_id>"
     echo ""
     echo "Arguments:"
-    echo "  domain_name          The domain name for Hive Mind (e.g., hive.example.com)"
     echo "  telegram_bot_token   Telegram Bot API token (from @BotFather)"
     echo "  telegram_group_id    Telegram Group ID (negative number for groups)"
     echo ""
     echo "Example:"
-    echo "  $0 hive.example.com 123456789:ABCdefGHIjklMNOpqrsTUVwxyz -1002975819706"
+    echo "  $0 123456789:ABCdefGHIjklMNOpqrsTUVwxyz -1002975819706"
     echo ""
     echo "Note: This script must be run as root or with sudo."
     exit 1
-}
-
-validate_domain() {
-    local domain="$1"
-    # Basic domain validation regex
-    if [[ ! "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
-        print_error "Invalid domain format: $domain"
-        print_info "Please enter a valid domain (e.g., hive.example.com)"
-        exit 1
-    fi
 }
 
 validate_telegram_token() {
@@ -135,7 +120,7 @@ generate_password() {
 check_root() {
     if [[ $EUID -ne 0 ]]; then
         print_error "This script must be run as root!"
-        print_info "Run with: sudo $0 <domain_name> <telegram_bot_token> <telegram_group_id>"
+        print_info "Run with: sudo $0 <telegram_bot_token> <telegram_group_id>"
         exit 1
     fi
 }
@@ -196,8 +181,6 @@ show_banner() {
     echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} Docker and Docker Compose                                             ${CYAN}║${NC}"
     echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} Hive Mind AI orchestrator                                             ${CYAN}║${NC}"
     echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} Telegram Bot integration                                              ${CYAN}║${NC}"
-    echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} Nginx as reverse proxy                                                ${CYAN}║${NC}"
-    echo -e "${CYAN}   ║${NC}   ${GREEN}•${NC} SSL certificate via Let's Encrypt                                     ${CYAN}║${NC}"
     echo -e "${CYAN}   ║${NC}                                                                           ${CYAN}║${NC}"
     echo -e "${CYAN}   ╚═══════════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
@@ -205,21 +188,18 @@ show_banner() {
 
 parse_arguments() {
     # Check if all required arguments are provided
-    if [[ $# -lt 3 ]] || [[ -z "$1" ]] || [[ -z "$2" ]] || [[ -z "$3" ]]; then
+    if [[ $# -lt 2 ]] || [[ -z "$1" ]] || [[ -z "$2" ]]; then
         print_error "Missing required arguments!"
         show_usage
     fi
 
-    DOMAIN_NAME="$1"
-    TELEGRAM_BOT_TOKEN="$2"
-    TELEGRAM_GROUP_ID="$3"
+    TELEGRAM_BOT_TOKEN="$1"
+    TELEGRAM_GROUP_ID="$2"
 
-    validate_domain "$DOMAIN_NAME"
     validate_telegram_token "$TELEGRAM_BOT_TOKEN"
     validate_telegram_group_id "$TELEGRAM_GROUP_ID"
 
     print_header "Configuration"
-    print_success "Domain configured: $DOMAIN_NAME"
     print_success "Telegram Bot Token: ${TELEGRAM_BOT_TOKEN:0:10}..."
     print_success "Telegram Group ID: $TELEGRAM_GROUP_ID"
 }
@@ -237,14 +217,6 @@ install_dependencies() {
     print_step "Installing required packages..."
     apt-get install -y -qq curl wget gnupg2 lsb-release ca-certificates apt-transport-https software-properties-common > /dev/null 2>&1
     print_success "Core utilities installed"
-
-    print_step "Installing Nginx..."
-    apt-get install -y -qq nginx > /dev/null 2>&1
-    print_success "Nginx installed"
-
-    print_step "Installing Certbot for SSL certificates..."
-    apt-get install -y -qq certbot python3-certbot-nginx > /dev/null 2>&1
-    print_success "Certbot installed"
 
     print_success "All system dependencies installed successfully!"
 }
@@ -323,7 +295,6 @@ create_env_file() {
         print_step "Updating Telegram configuration..."
         sed -i "s|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN|" "$INSTALL_DIR/.env"
         sed -i "s|^TELEGRAM_GROUP_ID=.*|TELEGRAM_GROUP_ID=$TELEGRAM_GROUP_ID|" "$INSTALL_DIR/.env"
-        sed -i "s|^DOMAIN_NAME=.*|DOMAIN_NAME=$DOMAIN_NAME|" "$INSTALL_DIR/.env"
         print_success "Telegram configuration updated"
         return
     fi
@@ -332,8 +303,6 @@ create_env_file() {
 
     cat > "$INSTALL_DIR/.env" << EOF
 # Hive Mind Configuration
-DOMAIN_NAME=$DOMAIN_NAME
-APP_PORT=$APP_PORT
 
 # Telegram Bot Configuration
 TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
@@ -432,153 +401,8 @@ start_docker_containers() {
     fi
 }
 
-configure_nginx() {
-    print_header "Configuring Nginx"
-
-    # Check if SSL certificate already exists - if so, skip nginx configuration
-    # to preserve the existing HTTPS configuration created by certbot
-    if [[ -d "/etc/letsencrypt/live/$DOMAIN_NAME" ]]; then
-        print_info "SSL certificate for $DOMAIN_NAME already exists"
-        print_step "Skipping Nginx configuration to preserve existing HTTPS settings..."
-        print_success "Using existing Nginx configuration"
-        return
-    fi
-
-    print_step "Creating Nginx configuration..."
-
-    # Note: Hive Mind Telegram bot doesn't expose HTTP, but we create a status page
-    tee /etc/nginx/sites-available/$DOMAIN_NAME > /dev/null << EOF
-server {
-    listen 80;
-    server_name $DOMAIN_NAME;
-
-    access_log /var/log/nginx/${DOMAIN_NAME}_access.log;
-    error_log /var/log/nginx/${DOMAIN_NAME}_error.log;
-
-    location / {
-        # Hive Mind Telegram bot status page
-        default_type text/html;
-        return 200 '<!DOCTYPE html>
-<html>
-<head>
-    <title>Hive Mind - Telegram Bot</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #1a1a2e; color: #eee; }
-        .container { max-width: 600px; margin: 0 auto; }
-        h1 { color: #00d9ff; }
-        .status { background: #16213e; padding: 20px; border-radius: 10px; margin: 20px 0; }
-        .running { color: #00ff88; }
-        a { color: #00d9ff; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Hive Mind</h1>
-        <p>The master mind AI that controls hive of AI agents</p>
-        <div class="status">
-            <p class="running">Telegram Bot is Active</p>
-            <p>Use Telegram to interact with Hive Mind</p>
-        </div>
-        <p><a href="https://github.com/link-assistant/hive-mind">Documentation</a></p>
-    </div>
-</body>
-</html>';
-    }
-
-    location /health {
-        default_type application/json;
-        return 200 '{"status":"ok","service":"hive-mind"}';
-    }
-}
-EOF
-
-    print_success "Nginx configuration created"
-
-    print_step "Enabling site..."
-    ln -sf /etc/nginx/sites-available/$DOMAIN_NAME /etc/nginx/sites-enabled/
-    print_success "Site enabled"
-
-    print_step "Testing Nginx configuration..."
-    if nginx -t > /dev/null 2>&1; then
-        print_success "Nginx configuration is valid"
-    else
-        print_error "Nginx configuration test failed"
-        nginx -t
-        exit 1
-    fi
-
-    print_step "Restarting Nginx..."
-    systemctl restart nginx
-    print_success "Nginx restarted"
-}
-
-setup_ssl_certificate() {
-    print_header "Setting Up SSL Certificate"
-
-    # Check if SSL certificate already exists
-    if [[ -d "/etc/letsencrypt/live/$DOMAIN_NAME" ]]; then
-        print_info "SSL certificate for $DOMAIN_NAME already exists"
-        print_step "Skipping certificate creation..."
-        print_success "Using existing SSL certificate"
-
-        # Make sure certbot timer is enabled for renewals
-        print_step "Ensuring automatic renewal is enabled..."
-        systemctl enable certbot.timer > /dev/null 2>&1
-        systemctl start certbot.timer
-        print_success "Automatic certificate renewal enabled"
-        return
-    fi
-
-    print_info "Obtaining SSL certificate from Let's Encrypt..."
-    print_info "Make sure DNS is properly configured and pointing to this server."
-
-    # Retry settings for handling transient Let's Encrypt errors
-    local max_attempts=3
-    local retry_delay=10
-    local attempt=1
-    local certbot_success=false
-
-    while [[ $attempt -le $max_attempts ]]; do
-        print_step "Running Certbot (attempt $attempt of $max_attempts)..."
-
-        # Run certbot with automatic configuration
-        if certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --register-unsafely-without-email --redirect; then
-            certbot_success=true
-            break
-        else
-            if [[ $attempt -lt $max_attempts ]]; then
-                print_warning "Certbot attempt $attempt failed. Retrying in $retry_delay seconds..."
-                sleep $retry_delay
-                # Increase delay for next attempt (exponential backoff)
-                retry_delay=$((retry_delay * 2))
-            fi
-        fi
-        ((attempt++))
-    done
-
-    if [[ "$certbot_success" == true ]]; then
-        print_success "SSL certificate obtained and configured"
-
-        print_step "Setting up automatic renewal..."
-        systemctl enable certbot.timer > /dev/null 2>&1
-        systemctl start certbot.timer
-        print_success "Automatic certificate renewal enabled"
-    else
-        print_warning "SSL certificate setup failed after $max_attempts attempts. You can run it manually later:"
-        print_info "certbot --nginx -d $DOMAIN_NAME"
-    fi
-}
-
-add_user_to_www_data() {
-    print_header "Configuring User Permissions"
-
-    print_step "Adding $CURRENT_USER to www-data group..."
-    usermod -aG www-data "$CURRENT_USER"
-    print_success "User added to www-data group"
-
-    print_step "Adding www-data to $INSTALLER_USER group..."
-    usermod -aG "$INSTALLER_USER" www-data
-    print_success "www-data added to $INSTALLER_USER group"
+set_directory_permissions() {
+    print_header "Configuring Directory Permissions"
 
     print_step "Setting directory permissions..."
     chown -R "$CURRENT_USER":"$CURRENT_USER" "$INSTALL_DIR"
@@ -663,7 +487,6 @@ show_completion_message() {
     print_header "Installation Summary"
 
     echo -e "${WHITE}Application Details:${NC}"
-    echo -e "  ${CYAN}•${NC} Domain:           ${BOLD}https://$DOMAIN_NAME${NC}"
     echo -e "  ${CYAN}•${NC} Install path:     ${BOLD}$INSTALL_DIR${NC}"
     echo ""
 
@@ -698,10 +521,9 @@ show_completion_message() {
     echo ""
 
     echo -e "${YELLOW}Next Steps:${NC}"
-    echo -e "  ${CYAN}1.${NC} Visit ${BOLD}https://$DOMAIN_NAME${NC} to verify installation"
-    echo -e "  ${CYAN}2.${NC} Add the bot to your Telegram group (ID: $TELEGRAM_GROUP_ID)"
-    echo -e "  ${CYAN}3.${NC} Use /help in the group to see available commands"
-    echo -e "  ${CYAN}4.${NC} Check ${BOLD}https://github.com/link-assistant/hive-mind${NC} for documentation"
+    echo -e "  ${CYAN}1.${NC} Add the bot to your Telegram group (ID: $TELEGRAM_GROUP_ID)"
+    echo -e "  ${CYAN}2.${NC} Use /help in the group to see available commands"
+    echo -e "  ${CYAN}3.${NC} Check ${BOLD}https://github.com/link-assistant/hive-mind${NC} for documentation"
     echo ""
 
     print_success "Thank you for using Hive Mind + Telegram Bot installer!"
@@ -728,7 +550,6 @@ main() {
 
     echo ""
     print_info "Starting installation. This may take several minutes..."
-    print_info "Domain: $DOMAIN_NAME"
     print_info "User: $CURRENT_USER"
     echo ""
 
@@ -739,9 +560,7 @@ main() {
     create_env_file
     create_docker_compose
     start_docker_containers
-    add_user_to_www_data
-    configure_nginx
-    setup_ssl_certificate
+    set_directory_permissions
     create_management_script
 
     # Show completion message
