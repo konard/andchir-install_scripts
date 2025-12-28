@@ -19,12 +19,16 @@ import re
 import json
 import argparse
 import logging
+import urllib.request
+import urllib.error
+import shutil
 from typing import Optional, List, Dict, Any
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QComboBox,
-    QGroupBox, QMessageBox, QSplitter, QFrame, QSpacerItem, QSizePolicy
+    QGroupBox, QMessageBox, QSplitter, QFrame, QSpacerItem, QSizePolicy,
+    QProgressDialog
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QIcon, QTextCursor
@@ -45,9 +49,13 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 SCRIPTS_BASE_URL = 'https://raw.githubusercontent.com/andchir/install_scripts/refs/heads/main/scripts'
+GITHUB_RAW_BASE_URL = 'https://raw.githubusercontent.com/andchir/install_scripts/refs/heads/main'
+GITHUB_API_SCRIPTS_URL = 'https://api.github.com/repos/andchir/install_scripts/contents/scripts?ref=main'
+LOCAL_DATA_DIR_NAME = '.install_scripts'
 SSH_DEFAULT_PORT = 22
 SSH_DEFAULT_TIMEOUT = 30
 DEFAULT_LANG = 'en'
+HTTP_TIMEOUT = 30
 
 # Translations
 TRANSLATIONS = {
@@ -77,6 +85,13 @@ TRANSLATIONS = {
                            '1. Вы использовали "pyinstaller InstallScripts.spec" для сборки\n'
                            '2. Файлы данных (data_ru.json, data_en.json) были включены\n\n'
                            'Для отладки запустите с флагом --debug или установите INSTALL_SCRIPTS_DEBUG=1',
+        'update_button': 'Обновить',
+        'update_title': 'Обновление данных',
+        'update_downloading_data': 'Загрузка файлов данных...',
+        'update_downloading_scripts': 'Загрузка скриптов...',
+        'update_success': 'Данные успешно обновлены!\n\nОбновлено файлов данных: {data_count}\nОбновлено скриптов: {scripts_count}',
+        'update_error': 'Ошибка при обновлении: {error}',
+        'update_confirm': 'Обновить скрипты и данные с GitHub?\n\nЭто загрузит последние версии файлов данных и скриптов.',
     },
     'en': {
         'window_title': 'Install Scripts - Software Installation',
@@ -104,6 +119,13 @@ TRANSLATIONS = {
                            '1. You used "pyinstaller InstallScripts.spec" to build\n'
                            '2. The data files (data_ru.json, data_en.json) were included\n\n'
                            'For debugging, run with --debug flag or set INSTALL_SCRIPTS_DEBUG=1',
+        'update_button': 'Update',
+        'update_title': 'Update Data',
+        'update_downloading_data': 'Downloading data files...',
+        'update_downloading_scripts': 'Downloading scripts...',
+        'update_success': 'Data updated successfully!\n\nData files updated: {data_count}\nScripts updated: {scripts_count}',
+        'update_error': 'Error during update: {error}',
+        'update_confirm': 'Update scripts and data from GitHub?\n\nThis will download the latest versions of data files and scripts.',
     }
 }
 
@@ -114,6 +136,52 @@ def strip_ansi_codes(text: Optional[str]) -> Optional[str]:
         return None
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     return ansi_escape.sub('', text)
+
+
+def get_local_data_dir() -> str:
+    """
+    Get the local data directory for storing updated scripts and data.
+
+    This directory is separate from the application itself, allowing updates
+    to persist across application restarts, especially in onefile mode.
+
+    Returns:
+        Path to the local data directory (e.g., ~/.install_scripts/)
+    """
+    home_dir = os.path.expanduser('~')
+    local_data_dir = os.path.join(home_dir, LOCAL_DATA_DIR_NAME)
+    return local_data_dir
+
+
+def ensure_local_data_dir() -> str:
+    """
+    Ensure the local data directory exists and return its path.
+
+    Creates the directory structure if it doesn't exist:
+    - ~/.install_scripts/
+    - ~/.install_scripts/scripts/
+
+    Returns:
+        Path to the local data directory
+    """
+    local_data_dir = get_local_data_dir()
+
+    if not os.path.exists(local_data_dir):
+        try:
+            os.makedirs(local_data_dir)
+            logger.debug(f"Created local data directory: {local_data_dir}")
+        except OSError as e:
+            logger.error(f"Failed to create local data directory: {e}")
+
+    scripts_dir = os.path.join(local_data_dir, 'scripts')
+    if not os.path.exists(scripts_dir):
+        try:
+            os.makedirs(scripts_dir)
+            logger.debug(f"Created scripts directory: {scripts_dir}")
+        except OSError as e:
+            logger.error(f"Failed to create scripts directory: {e}")
+
+    return local_data_dir
 
 
 def get_base_path() -> str:
@@ -138,19 +206,40 @@ def get_base_path() -> str:
 
 
 def get_data_file_path(lang: str) -> str:
-    """Get the path to the data file for the specified language."""
-    base_path = get_base_path()
+    """
+    Get the path to the data file for the specified language.
 
+    Priority order:
+    1. Local data directory (for updated files)
+    2. Bundled/development files
+    """
+    # First, check local data directory (for updated files)
+    local_data_dir = get_local_data_dir()
+    local_data_file = os.path.join(local_data_dir, f'data_{lang}.json')
+    logger.debug(f"Looking for local data file: {local_data_file}")
+
+    if os.path.exists(local_data_file):
+        logger.debug(f"Found local data file: {local_data_file}")
+        return local_data_file
+
+    # Fall back to bundled/development files
+    base_path = get_base_path()
     data_file = os.path.join(base_path, f'data_{lang}.json')
-    logger.debug(f"Looking for data file: {data_file}")
+    logger.debug(f"Looking for bundled data file: {data_file}")
 
     if os.path.exists(data_file):
-        logger.debug(f"Found data file: {data_file}")
+        logger.debug(f"Found bundled data file: {data_file}")
         return data_file
 
     logger.debug(f"Data file not found: {data_file}")
 
-    # Fall back to default language
+    # Fall back to default language in local directory
+    local_default_file = os.path.join(local_data_dir, f'data_{DEFAULT_LANG}.json')
+    if os.path.exists(local_default_file):
+        logger.debug(f"Found local fallback data file: {local_default_file}")
+        return local_default_file
+
+    # Fall back to default language in bundled files
     default_file = os.path.join(base_path, f'data_{DEFAULT_LANG}.json')
     logger.debug(f"Trying fallback data file: {default_file}")
 
@@ -318,6 +407,152 @@ class SSHWorker(QThread):
                     pass
 
 
+class UpdateWorker(QThread):
+    """Worker thread for downloading updates from GitHub."""
+
+    progress_changed = pyqtSignal(str)  # Status message
+    finished_signal = pyqtSignal(bool, str, int, int)  # success, message, data_count, scripts_count
+
+    def __init__(self):
+        super().__init__()
+        self._stop_requested = False
+
+    def request_stop(self):
+        """Request the worker to stop."""
+        self._stop_requested = True
+
+    def _download_file(self, url: str, dest_path: str) -> bool:
+        """
+        Download a file from URL to destination path.
+
+        Returns:
+            True if download was successful, False otherwise.
+        """
+        try:
+            logger.debug(f"Downloading {url} to {dest_path}")
+            request = urllib.request.Request(
+                url,
+                headers={'User-Agent': 'InstallScripts-GUI/1.0'}
+            )
+            with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+                content = response.read()
+
+            # Write to file
+            with open(dest_path, 'wb') as f:
+                f.write(content)
+
+            logger.debug(f"Successfully downloaded {url}")
+            return True
+
+        except urllib.error.HTTPError as e:
+            logger.error(f"HTTP error downloading {url}: {e.code} {e.reason}")
+            return False
+        except urllib.error.URLError as e:
+            logger.error(f"URL error downloading {url}: {e.reason}")
+            return False
+        except Exception as e:
+            logger.error(f"Error downloading {url}: {e}")
+            return False
+
+    def _get_scripts_list_from_github(self) -> List[Dict[str, Any]]:
+        """
+        Get list of script files from GitHub API.
+
+        Returns:
+            List of dictionaries with 'name' and 'download_url' keys.
+        """
+        try:
+            logger.debug(f"Fetching scripts list from {GITHUB_API_SCRIPTS_URL}")
+            request = urllib.request.Request(
+                GITHUB_API_SCRIPTS_URL,
+                headers={
+                    'User-Agent': 'InstallScripts-GUI/1.0',
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            )
+            with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+                content = response.read().decode('utf-8')
+                items = json.loads(content)
+
+            # Filter for shell scripts
+            scripts = []
+            for item in items:
+                if item.get('type') == 'file' and item.get('name', '').endswith('.sh'):
+                    scripts.append({
+                        'name': item['name'],
+                        'download_url': item.get('download_url', '')
+                    })
+
+            logger.debug(f"Found {len(scripts)} scripts on GitHub")
+            return scripts
+
+        except Exception as e:
+            logger.error(f"Error fetching scripts list: {e}")
+            return []
+
+    def run(self):
+        """Download updates from GitHub."""
+        data_count = 0
+        scripts_count = 0
+
+        try:
+            # Ensure local data directory exists
+            local_data_dir = ensure_local_data_dir()
+            scripts_dir = os.path.join(local_data_dir, 'scripts')
+
+            if self._stop_requested:
+                self.finished_signal.emit(False, 'Stopped by user', 0, 0)
+                return
+
+            # Download data files
+            self.progress_changed.emit('Downloading data files...')
+            data_files = ['data_ru.json', 'data_en.json']
+
+            for data_file in data_files:
+                if self._stop_requested:
+                    self.finished_signal.emit(False, 'Stopped by user', data_count, scripts_count)
+                    return
+
+                url = f"{GITHUB_RAW_BASE_URL}/{data_file}"
+                dest_path = os.path.join(local_data_dir, data_file)
+
+                if self._download_file(url, dest_path):
+                    data_count += 1
+                    logger.info(f"Updated {data_file}")
+
+            if self._stop_requested:
+                self.finished_signal.emit(False, 'Stopped by user', data_count, scripts_count)
+                return
+
+            # Download scripts
+            self.progress_changed.emit('Downloading scripts...')
+            scripts = self._get_scripts_list_from_github()
+
+            for script in scripts:
+                if self._stop_requested:
+                    self.finished_signal.emit(False, 'Stopped by user', data_count, scripts_count)
+                    return
+
+                script_name = script['name']
+                download_url = script['download_url']
+
+                if not download_url:
+                    # Fallback URL construction
+                    download_url = f"{GITHUB_RAW_BASE_URL}/scripts/{script_name}"
+
+                dest_path = os.path.join(scripts_dir, script_name)
+
+                if self._download_file(download_url, dest_path):
+                    scripts_count += 1
+                    logger.info(f"Updated script: {script_name}")
+
+            self.finished_signal.emit(True, 'Update completed', data_count, scripts_count)
+
+        except Exception as e:
+            logger.error(f"Update error: {e}")
+            self.finished_signal.emit(False, str(e), data_count, scripts_count)
+
+
 class MainWindow(QMainWindow):
     """Main application window."""
 
@@ -327,6 +562,7 @@ class MainWindow(QMainWindow):
         self.tr = TRANSLATIONS.get(lang, TRANSLATIONS[DEFAULT_LANG])
         self.scripts = load_scripts(lang)
         self.worker = None
+        self.update_worker = None
         self._scripts_load_error = len(self.scripts) == 0
 
         logger.debug(f"MainWindow initialized with {len(self.scripts)} scripts")
@@ -347,9 +583,16 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
-        # Language selector at the top right
+        # Language selector and Update button at the top right
         lang_layout = QHBoxLayout()
         lang_layout.addStretch()
+
+        # Update button
+        self.update_button = QPushButton(self.tr['update_button'])
+        self.update_button.clicked.connect(self.on_update_clicked)
+        lang_layout.addWidget(self.update_button)
+
+        # Language selector
         self.lang_label = QLabel(self.tr['language_label'])
         self.lang_combo = QComboBox()
         self.lang_combo.addItem('English', 'en')
@@ -671,6 +914,92 @@ class MainWindow(QMainWindow):
         """Clear the report text."""
         self.report_text.clear()
 
+    def on_update_clicked(self):
+        """Handle update button click."""
+        # Ask for confirmation
+        reply = QMessageBox.question(
+            self,
+            self.tr['update_title'],
+            self.tr['update_confirm'],
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Disable update button during update
+        self.update_button.setEnabled(False)
+
+        # Create progress dialog
+        self.update_progress = QProgressDialog(
+            self.tr['update_downloading_data'],
+            None,  # No cancel button
+            0, 0,  # Indeterminate progress
+            self
+        )
+        self.update_progress.setWindowTitle(self.tr['update_title'])
+        self.update_progress.setWindowModality(Qt.WindowModality.WindowModal)
+        self.update_progress.setMinimumDuration(0)
+        self.update_progress.show()
+
+        # Create and start update worker
+        self.update_worker = UpdateWorker()
+        self.update_worker.progress_changed.connect(self.on_update_progress)
+        self.update_worker.finished_signal.connect(self.on_update_finished)
+        self.update_worker.start()
+
+    def on_update_progress(self, message: str):
+        """Handle update progress change."""
+        if hasattr(self, 'update_progress') and self.update_progress:
+            self.update_progress.setLabelText(message)
+
+    def on_update_finished(self, success: bool, message: str, data_count: int, scripts_count: int):
+        """Handle update completion."""
+        # Close progress dialog
+        if hasattr(self, 'update_progress') and self.update_progress:
+            self.update_progress.close()
+            self.update_progress = None
+
+        # Re-enable update button
+        self.update_button.setEnabled(True)
+
+        if success:
+            # Reload scripts with the new data
+            self.scripts = load_scripts(self.lang)
+
+            # Update the software combo box
+            current_selection = self.software_combo.currentIndex()
+            self.software_combo.clear()
+            for script in self.scripts:
+                display_text = script.get('name', '')
+                self.software_combo.addItem(display_text, script)
+
+            # Restore selection if possible
+            if 0 <= current_selection < len(self.scripts):
+                self.software_combo.setCurrentIndex(current_selection)
+            elif self.scripts:
+                self.software_combo.setCurrentIndex(0)
+
+            # Update description
+            self.on_script_selection_changed(self.software_combo.currentIndex())
+
+            # Show success message
+            QMessageBox.information(
+                self,
+                self.tr['update_title'],
+                self.tr['update_success'].format(data_count=data_count, scripts_count=scripts_count)
+            )
+        else:
+            # Show error message
+            QMessageBox.warning(
+                self,
+                self.tr['update_title'],
+                self.tr['update_error'].format(error=message)
+            )
+
+        self.update_worker = None
+
     def on_language_changed(self, index: int):
         """Handle language selection change."""
         new_lang = self.lang_combo.itemData(index)
@@ -720,6 +1049,7 @@ class MainWindow(QMainWindow):
         self.on_script_selection_changed(self.software_combo.currentIndex())
 
         # Update buttons
+        self.update_button.setText(self.tr['update_button'])
         self.install_button.setText(self.tr['install_button'])
         self.stop_button.setText(self.tr['stop_button'])
         self.clear_button.setText(self.tr['clear_button'])
