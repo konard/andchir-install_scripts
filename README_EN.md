@@ -38,6 +38,7 @@ This project provides a set of bash scripts for quick deployment of popular soft
 | `jitsi-meet.sh` | Jitsi Meet video conferencing platform | Prosody XMPP, Jitsi Videobridge, Jicofo, Nginx, Certbot |
 | `netdata.sh` | Real-time server monitoring system | Netdata, Nginx, Certbot, basic authentication |
 | `uptime-kuma.sh` | Self-hosted uptime monitoring tool | Git, Node.js 20.x, npm, Nginx, Certbot, systemd service |
+| `linux-dash.sh` | Linux server monitoring dashboard | Git, Python 3, linux-dash, Nginx, Certbot, basic authentication, systemd service |
 
 ## Usage
 
