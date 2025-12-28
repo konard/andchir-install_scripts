@@ -40,6 +40,7 @@ This project provides a set of bash scripts for quick deployment of popular soft
 | `uptime-kuma.sh` | Self-hosted uptime monitoring tool | Git, Node.js 20.x, npm, Nginx, Certbot, systemd service |
 | `linux-dash.sh` | Linux server monitoring dashboard | Git, Python 3, linux-dash, Nginx, Certbot, basic authentication, systemd service |
 | `gpt4free.sh` | Free GPT4Free interface for working with various LLMs | Git, Python 3, pip, venv, Nginx, Certbot, GPT4Free with web interface and API, basic authentication, systemd service |
+| `teable.sh` | Spreadsheet-database platform Teable | Docker, Docker Compose, PostgreSQL 15, Redis 7, Teable, Nginx, Certbot |
 | `hive-mind.sh` | Hive Mind AI orchestrator with Telegram bot | Docker, Docker Compose, Hive Mind, Telegram Bot, Nginx, Certbot |
 
 ## Usage
