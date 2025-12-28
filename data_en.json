@@ -94,5 +94,11 @@
     "script_name": "linux-dash",
     "description": "Linux server monitoring dashboard with web interface. Installs: Git, Python 3, linux-dash, Nginx, Certbot, basic authentication, systemd service",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "link-assistant/hive-mind",
+    "script_name": "hive-mind",
+    "description": "Hive Mind AI orchestrator with Telegram bot integration. Installs: Docker, Docker Compose, Hive Mind, Telegram Bot",
+    "info": "Required parameters: Telegram bot token, Telegram group ID"
   }
 ]

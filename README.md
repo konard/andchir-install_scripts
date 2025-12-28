@@ -39,6 +39,7 @@
 | `netdata.sh` | Система мониторинга серверов в реальном времени | Netdata, Nginx, Certbot, базовая аутентификация |
 | `uptime-kuma.sh` | Инструмент мониторинга статусов сервисов | Git, Node.js 20.x, npm, Nginx, Certbot, systemd-сервис |
 | `linux-dash.sh` | Панель мониторинга системы Linux | Git, Python 3, linux-dash, Nginx, Certbot, базовая аутентификация, systemd-сервис |
+| `hive-mind.sh` | AI-оркестратор Hive Mind с Telegram-ботом | Docker, Docker Compose, Hive Mind, Telegram Bot, Nginx, Certbot |
 
 ## Использование
 
