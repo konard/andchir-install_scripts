@@ -94,5 +94,11 @@
     "script_name": "linux-dash",
     "description": "Linux server monitoring dashboard with web interface. Installs: Git, Python 3, linux-dash, Nginx, Certbot, basic authentication, systemd service",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "xtekky/gpt4free",
+    "script_name": "gpt4free",
+    "description": "Free GPT4Free API interface for working with various LLM providers. Installs: Git, Python 3, pip, venv, Nginx, Certbot, GPT4Free with web interface and API, systemd service",
+    "info": "Required parameter: domain name"
   }
 ]
