@@ -39,6 +39,7 @@ This project provides a set of bash scripts for quick deployment of popular soft
 | `netdata.sh` | Real-time server monitoring system | Netdata, Nginx, Certbot, basic authentication |
 | `uptime-kuma.sh` | Self-hosted uptime monitoring tool | Git, Node.js 20.x, npm, Nginx, Certbot, systemd service |
 | `linux-dash.sh` | Linux server monitoring dashboard | Git, Python 3, linux-dash, Nginx, Certbot, basic authentication, systemd service |
+| `teable.sh` | Spreadsheet-database platform Teable | Docker, Docker Compose, PostgreSQL 15, Redis 7, Teable, Nginx, Certbot |
 | `hive-mind.sh` | Hive Mind AI orchestrator with Telegram bot | Docker, Docker Compose, Hive Mind, Telegram Bot, Nginx, Certbot |
 
 ## Usage

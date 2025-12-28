@@ -96,6 +96,12 @@
     "info": "Необходимый параметр: доменное имя"
   },
   {
+    "name": "teableio/teable",
+    "script_name": "teable",
+    "description": "Платформа электронных таблиц с функциями базы данных Teable. Устанавливает: Docker, Docker Compose, PostgreSQL 15, Redis 7, Teable, Nginx, Certbot",
+    "info": "Необходимый параметр: доменное имя"
+  },
+  {
     "name": "link-assistant/hive-mind",
     "script_name": "hive-mind",
     "description": "AI-оркестратор Hive Mind с интеграцией Telegram-бота. Устанавливает: Docker, Docker Compose, Hive Mind, Telegram Bot",
