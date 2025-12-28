@@ -1,3 +1,6 @@
+[![ru](https://img.shields.io/badge/lang-ru-green.svg)](README.md)
+[![en](https://img.shields.io/badge/lang-en-red.svg)](README_EN.md)
+
 # Install Scripts
 
 Коллекция скриптов для автоматической установки различного программного обеспечения на удалённые серверы Ubuntu 24.04.
