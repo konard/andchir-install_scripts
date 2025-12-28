@@ -88,5 +88,11 @@
     "script_name": "uptime-kuma",
     "description": "Инструмент мониторинга статусов сервисов Uptime Kuma. Устанавливает: Git, Node.js 20.x, npm, Nginx, Certbot, systemd-сервис",
     "info": "Необходимый параметр: доменное имя"
+  },
+  {
+    "name": "tariqbuilds/linux-dash",
+    "script_name": "linux-dash",
+    "description": "Панель мониторинга системы Linux с веб-интерфейсом. Устанавливает: Git, Python 3, linux-dash, Nginx, Certbot, базовую аутентификацию, systemd-сервис",
+    "info": "Необходимый параметр: доменное имя"
   }
 ]

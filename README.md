@@ -38,6 +38,7 @@
 | `jitsi-meet.sh` | Платформа для видеоконференций Jitsi Meet | Prosody XMPP, Jitsi Videobridge, Jicofo, Nginx, Certbot |
 | `netdata.sh` | Система мониторинга серверов в реальном времени | Netdata, Nginx, Certbot, базовая аутентификация |
 | `uptime-kuma.sh` | Инструмент мониторинга статусов сервисов | Git, Node.js 20.x, npm, Nginx, Certbot, systemd-сервис |
+| `linux-dash.sh` | Панель мониторинга системы Linux | Git, Python 3, linux-dash, Nginx, Certbot, базовая аутентификация, systemd-сервис |
 
 ## Использование
 

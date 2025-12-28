@@ -88,5 +88,11 @@
     "script_name": "uptime-kuma",
     "description": "Self-hosted uptime monitoring tool Uptime Kuma. Installs: Git, Node.js 20.x, npm, Nginx, Certbot, systemd service",
     "info": "Required parameter: domain name"
+  },
+  {
+    "name": "tariqbuilds/linux-dash",
+    "script_name": "linux-dash",
+    "description": "Linux server monitoring dashboard with web interface. Installs: Git, Python 3, linux-dash, Nginx, Certbot, basic authentication, systemd service",
+    "info": "Required parameter: domain name"
   }
 ]
