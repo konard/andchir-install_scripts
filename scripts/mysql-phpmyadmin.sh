@@ -41,18 +41,31 @@ CURRENT_USER=""
 HOME_DIR=""
 INSTALL_DIR=""
 
+# Security options (will be set by command line arguments)
+ALLOWED_IP=""
+ENABLE_BASIC_AUTH="false"
+BASIC_AUTH_USER=""
+BASIC_AUTH_PASSWORD=""
+
 #-------------------------------------------------------------------------------
 # Helper functions
 #-------------------------------------------------------------------------------
 
 show_usage() {
-    echo "Usage: $0 <domain_name>"
+    echo "Usage: $0 <domain_name> [options]"
     echo ""
     echo "Arguments:"
-    echo "  domain_name    The domain name for phpMyAdmin (e.g., db.example.com)"
+    echo "  domain_name              The domain name for phpMyAdmin (e.g., db.example.com)"
     echo ""
-    echo "Example:"
+    echo "Options:"
+    echo "  --allowed-ip <IP>        Restrict access to specific IP address"
+    echo "  --basic-auth             Enable HTTP Basic Authentication"
+    echo ""
+    echo "Examples:"
     echo "  $0 db.example.com"
+    echo "  $0 db.example.com --allowed-ip 192.168.1.100"
+    echo "  $0 db.example.com --basic-auth"
+    echo "  $0 db.example.com --allowed-ip 192.168.1.100 --basic-auth"
     echo ""
     echo "Note: This script must be run as root or with sudo."
     exit 1
@@ -66,6 +79,25 @@ validate_domain() {
         print_info "Please enter a valid domain (e.g., db.example.com)"
         exit 1
     fi
+}
+
+validate_ip() {
+    local ip="$1"
+    # IP address validation regex (IPv4)
+    if [[ ! "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        print_error "Invalid IP address format: $ip"
+        print_info "Please enter a valid IPv4 address (e.g., 192.168.1.100)"
+        exit 1
+    fi
+    # Validate each octet is 0-255
+    IFS='.' read -ra OCTETS <<< "$ip"
+    for octet in "${OCTETS[@]}"; do
+        if [[ $octet -gt 255 ]]; then
+            print_error "Invalid IP address format: $ip"
+            print_info "Each octet must be between 0 and 255"
+            exit 1
+        fi
+    done
 }
 
 print_header() {
@@ -178,9 +210,39 @@ parse_arguments() {
 
     DOMAIN_NAME="$1"
     validate_domain "$DOMAIN_NAME"
+    shift
 
-    print_header "Domain Configuration"
+    # Parse optional arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --allowed-ip)
+                if [[ -z "$2" ]] || [[ "$2" == --* ]]; then
+                    print_error "--allowed-ip requires an IP address argument"
+                    show_usage
+                fi
+                ALLOWED_IP="$2"
+                validate_ip "$ALLOWED_IP"
+                shift 2
+                ;;
+            --basic-auth)
+                ENABLE_BASIC_AUTH="true"
+                shift
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                show_usage
+                ;;
+        esac
+    done
+
+    print_header "Configuration"
     print_success "Domain configured: $DOMAIN_NAME"
+    if [[ -n "$ALLOWED_IP" ]]; then
+        print_success "IP restriction enabled: $ALLOWED_IP"
+    fi
+    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
+        print_success "Basic Authentication: enabled"
+    fi
 }
 
 install_dependencies() {
@@ -210,7 +272,7 @@ install_dependencies() {
     print_success "Certbot installed"
 
     print_step "Installing additional utilities..."
-    apt-get install -y -qq wget unzip > /dev/null 2>&1
+    apt-get install -y -qq wget unzip apache2-utils > /dev/null 2>&1
     print_success "Additional utilities installed"
 
     print_success "All system dependencies installed successfully!"
@@ -423,6 +485,46 @@ get_php_fpm_socket() {
     echo "$PHP_FPM_SOCKET"
 }
 
+create_htpasswd() {
+    print_header "Creating Basic Authentication"
+
+    HTPASSWD_FILE="/etc/nginx/.htpasswd-phpmyadmin"
+
+    # Check if htpasswd file already exists
+    if [[ -f "$HTPASSWD_FILE" ]]; then
+        print_info "Authentication file already exists"
+        print_step "Skipping password generation to preserve existing credentials..."
+
+        # Read existing username from file
+        BASIC_AUTH_USER=$(head -1 "$HTPASSWD_FILE" | cut -d':' -f1)
+        BASIC_AUTH_PASSWORD="(stored in $HTPASSWD_FILE)"
+        export BASIC_AUTH_USER BASIC_AUTH_PASSWORD
+        print_success "Using existing authentication configuration"
+        return
+    fi
+
+    BASIC_AUTH_USER="admin"
+    BASIC_AUTH_PASSWORD=$(generate_password)
+
+    print_step "Creating htpasswd file for basic authentication..."
+    htpasswd -bc "$HTPASSWD_FILE" "$BASIC_AUTH_USER" "$BASIC_AUTH_PASSWORD" > /dev/null 2>&1
+    chmod 640 "$HTPASSWD_FILE"
+    chown root:www-data "$HTPASSWD_FILE"
+    print_success "Authentication file created"
+
+    # Store credentials for reference
+    CREDENTIALS_FILE="$HOME_DIR/.phpmyadmin-auth"
+    cat > "$CREDENTIALS_FILE" << EOF
+BASIC_AUTH_USER=$BASIC_AUTH_USER
+BASIC_AUTH_PASSWORD=$BASIC_AUTH_PASSWORD
+EOF
+    chown "$CURRENT_USER":"$CURRENT_USER" "$CREDENTIALS_FILE"
+    chmod 600 "$CREDENTIALS_FILE"
+    print_success "Credentials saved to $CREDENTIALS_FILE"
+
+    export BASIC_AUTH_USER BASIC_AUTH_PASSWORD
+}
+
 configure_nginx() {
     print_header "Configuring Nginx"
 
@@ -444,6 +546,25 @@ configure_nginx() {
 
     print_info "Using PHP-FPM socket: $PHP_FPM_SOCKET"
 
+    # Build IP restriction directives
+    local IP_RESTRICTION=""
+    if [[ -n "$ALLOWED_IP" ]]; then
+        IP_RESTRICTION="
+    # IP address restriction
+    allow $ALLOWED_IP;
+    deny all;"
+        print_info "IP restriction configured for: $ALLOWED_IP"
+    fi
+
+    # Build Basic Auth directives
+    local BASIC_AUTH_DIRECTIVES=""
+    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
+        BASIC_AUTH_DIRECTIVES="
+        auth_basic \"phpMyAdmin\";
+        auth_basic_user_file /etc/nginx/.htpasswd-phpmyadmin;"
+        print_info "Basic Authentication enabled"
+    fi
+
     print_step "Creating Nginx configuration..."
 
     tee /etc/nginx/sites-available/$DOMAIN_NAME > /dev/null << EOF
@@ -456,12 +577,13 @@ server {
 
     access_log /var/log/nginx/${DOMAIN_NAME}_access.log;
     error_log /var/log/nginx/${DOMAIN_NAME}_error.log;
+$IP_RESTRICTION
 
-    location / {
+    location / {$BASIC_AUTH_DIRECTIVES
         try_files \$uri \$uri/ /index.php?\$args;
     }
 
-    location ~ \.php\$ {
+    location ~ \.php\$ {$BASIC_AUTH_DIRECTIVES
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:$PHP_FPM_SOCKET;
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
@@ -581,6 +703,19 @@ show_completion_message() {
     echo -e "  ${CYAN}*${NC} Password:          ${BOLD}$PMA_PASSWORD${NC}"
     echo ""
 
+    # Show security settings if configured
+    if [[ -n "$ALLOWED_IP" ]] || [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
+        echo -e "${WHITE}Security Settings:${NC}"
+        if [[ -n "$ALLOWED_IP" ]]; then
+            echo -e "  ${CYAN}*${NC} IP restriction:    ${BOLD}Access allowed only from $ALLOWED_IP${NC}"
+        fi
+        if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
+            echo -e "  ${CYAN}*${NC} Basic Auth user:   ${BOLD}$BASIC_AUTH_USER${NC}"
+            echo -e "  ${CYAN}*${NC} Basic Auth pass:   ${BOLD}$BASIC_AUTH_PASSWORD${NC}"
+        fi
+        echo ""
+    fi
+
     echo -e "${WHITE}Service Management:${NC}"
     echo -e "  ${CYAN}*${NC} MySQL status:      ${BOLD}sudo systemctl status mysql${NC}"
     echo -e "  ${CYAN}*${NC} Nginx status:      ${BOLD}sudo systemctl status nginx${NC}"
@@ -590,14 +725,23 @@ show_completion_message() {
 
     echo -e "${YELLOW}Important:${NC}"
     echo -e "  ${CYAN}*${NC} Credentials are stored in: ${BOLD}$HOME_DIR/.mysql_credentials${NC}"
+    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
+        echo -e "  ${CYAN}*${NC} Basic Auth credentials: ${BOLD}$HOME_DIR/.phpmyadmin-auth${NC}"
+    fi
     echo -e "  ${CYAN}*${NC} Please save the passwords in a secure location"
     echo -e "  ${CYAN}*${NC} Consider changing the default passwords after first login"
     echo ""
 
     echo -e "${YELLOW}Next Steps:${NC}"
     echo -e "  ${CYAN}1.${NC} Visit ${BOLD}https://$DOMAIN_NAME${NC} to access phpMyAdmin"
-    echo -e "  ${CYAN}2.${NC} Log in with the credentials shown above"
-    echo -e "  ${CYAN}3.${NC} Create databases and users as needed"
+    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
+        echo -e "  ${CYAN}2.${NC} Enter Basic Auth credentials when prompted"
+        echo -e "  ${CYAN}3.${NC} Log in to phpMyAdmin with MySQL credentials"
+        echo -e "  ${CYAN}4.${NC} Create databases and users as needed"
+    else
+        echo -e "  ${CYAN}2.${NC} Log in with the credentials shown above"
+        echo -e "  ${CYAN}3.${NC} Create databases and users as needed"
+    fi
     echo ""
 
     print_success "Thank you for using MySQL + phpMyAdmin installer!"
@@ -626,6 +770,12 @@ main() {
     print_info "Starting installation. This may take several minutes..."
     print_info "Domain: $DOMAIN_NAME"
     print_info "User: $CURRENT_USER"
+    if [[ -n "$ALLOWED_IP" ]]; then
+        print_info "IP restriction: $ALLOWED_IP"
+    fi
+    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
+        print_info "Basic Authentication: enabled"
+    fi
     echo ""
 
     # Execute installation steps
@@ -634,6 +784,12 @@ main() {
     download_phpmyadmin
     configure_phpmyadmin
     add_user_to_www_data
+
+    # Create htpasswd file if Basic Auth is enabled
+    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
+        create_htpasswd
+    fi
+
     configure_nginx
     setup_ssl_certificate
 
