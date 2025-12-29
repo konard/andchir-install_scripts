@@ -42,7 +42,7 @@
 | `gpt4free.sh` | Бесплатный интерфейс GPT4Free для работы с различными LLM | Git, Python 3, pip, venv, Nginx, Certbot, GPT4Free с веб-интерфейсом и API, базовая аутентификация, systemd-сервис |
 | `teable.sh` | Платформа электронных таблиц с функциями базы данных Teable | Docker, Docker Compose, PostgreSQL 15, Redis 7, Teable, Nginx, Certbot |
 | `hive-mind.sh` | AI-оркестратор Hive Mind с Telegram-ботом | Docker, Docker Compose, Hive Mind, Telegram Bot, Nginx, Certbot |
-| `libretranslate.sh` | Бесплатный API машинного перевода LibreTranslate | Git, Python 3, pip, venv, Nginx, Certbot, все языковые модели, API ключ, systemd-сервис |
+| `libretranslate.sh` | Бесплатный API машинного перевода LibreTranslate | Git, Python 3, pip, venv, Nginx, Certbot, выбранные языковые модели (по умолчанию: en,de,ru), API ключ, systemd-сервис |
 
 ## Использование
 

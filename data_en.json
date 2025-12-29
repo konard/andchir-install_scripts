@@ -116,7 +116,7 @@
   {
     "name": "LibreTranslate/LibreTranslate",
     "script_name": "libretranslate",
-    "description": "Free and open source machine translation API LibreTranslate. Installs: Git, Python 3, pip, venv, Nginx, Certbot, all language models, API key, systemd service",
-    "info": "Required parameter: domain name"
+    "description": "Free and open source machine translation API LibreTranslate. Installs: Git, Python 3, pip, venv, Nginx, Certbot, selected language models, API key, systemd service",
+    "info": "Required parameters: domain name, languages list (optional, default: en,de,ru)"
   }
 ]

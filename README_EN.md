@@ -42,7 +42,7 @@ This project provides a set of bash scripts for quick deployment of popular soft
 | `gpt4free.sh` | Free GPT4Free interface for working with various LLMs | Git, Python 3, pip, venv, Nginx, Certbot, GPT4Free with web interface and API, basic authentication, systemd service |
 | `teable.sh` | Spreadsheet-database platform Teable | Docker, Docker Compose, PostgreSQL 15, Redis 7, Teable, Nginx, Certbot |
 | `hive-mind.sh` | Hive Mind AI orchestrator with Telegram bot | Docker, Docker Compose, Hive Mind, Telegram Bot, Nginx, Certbot |
-| `libretranslate.sh` | Free and open source machine translation API LibreTranslate | Git, Python 3, pip, venv, Nginx, Certbot, all language models, API key, systemd service |
+| `libretranslate.sh` | Free and open source machine translation API LibreTranslate | Git, Python 3, pip, venv, Nginx, Certbot, selected language models (default: en,de,ru), API key, systemd service |
 
 ## Usage
 

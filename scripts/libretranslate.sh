@@ -8,7 +8,7 @@
 #   This script automatically installs and configures:
 #   - Git, Python 3.10+, Nginx, Certbot
 #   - LibreTranslate translation API
-#   - Downloads all available language models
+#   - Downloads specified language models (default: en,de,ru)
 #   - Sets up Python virtual environment with dependencies
 #   - Creates systemd service for automatic startup
 #   - Configures Nginx as reverse proxy
@@ -43,25 +43,34 @@ PYTHON_VERSION="python3"
 INSTALLER_USER="installer_user"
 APP_PORT="5000"
 
+# Default languages to install (can be overridden via second argument)
+DEFAULT_LANGUAGES="en,de,ru"
+
 # These will be set after user setup
 CURRENT_USER=""
 HOME_DIR=""
 INSTALL_DIR=""
 VENV_DIR=""
 API_KEY=""
+LANGUAGES=""
 
 #-------------------------------------------------------------------------------
 # Helper functions
 #-------------------------------------------------------------------------------
 
 show_usage() {
-    echo "Usage: $0 <domain_name>"
+    echo "Usage: $0 <domain_name> [languages]"
     echo ""
     echo "Arguments:"
     echo "  domain_name    The domain name for the LibreTranslate web interface (e.g., translate.example.com)"
+    echo "  languages      Optional comma-separated list of language codes to install (default: en,de,ru)"
     echo ""
-    echo "Example:"
+    echo "Examples:"
     echo "  $0 translate.example.com"
+    echo "  $0 translate.example.com en,de,ru"
+    echo "  $0 translate.example.com en,es,fr,de,it,pt,ru,zh,ja,ko"
+    echo ""
+    echo "Available language codes: https://libretranslate.com/languages"
     echo ""
     echo "Note: This script must be run as root or with sudo."
     exit 1
@@ -73,6 +82,17 @@ validate_domain() {
     if [[ ! "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$ ]]; then
         print_error "Invalid domain format: $domain"
         print_info "Please enter a valid domain (e.g., translate.example.com)"
+        exit 1
+    fi
+}
+
+validate_languages() {
+    local languages="$1"
+    # Languages format validation: comma-separated 2-3 letter codes (e.g., en,de,ru or en,zh,ja)
+    if [[ ! "$languages" =~ ^[a-z]{2,3}(,[a-z]{2,3})*$ ]]; then
+        print_error "Invalid languages format: $languages"
+        print_info "Languages must be comma-separated 2-3 letter codes (e.g., en,de,ru)"
+        print_info "Available language codes: https://libretranslate.com/languages"
         exit 1
     fi
 }
@@ -188,8 +208,17 @@ parse_arguments() {
     DOMAIN_NAME="$1"
     validate_domain "$DOMAIN_NAME"
 
-    print_header "Domain Configuration"
+    # Set languages (use second argument if provided, otherwise use default)
+    if [[ -n "$2" ]]; then
+        LANGUAGES="$2"
+        validate_languages "$LANGUAGES"
+    else
+        LANGUAGES="$DEFAULT_LANGUAGES"
+    fi
+
+    print_header "Configuration"
     print_success "Domain configured: $DOMAIN_NAME"
+    print_success "Languages configured: $LANGUAGES"
 }
 
 install_dependencies() {
@@ -274,8 +303,8 @@ setup_python_environment() {
 download_language_models() {
     print_header "Downloading Language Models"
 
-    print_info "This will download all available language models."
-    print_info "This process may take a significant amount of time depending on your connection..."
+    print_info "This will download language models for: $LANGUAGES"
+    print_info "This process may take some time depending on your connection..."
 
     # Create data directory if it doesn't exist
     DATA_DIR="$INSTALL_DIR/data"
@@ -284,11 +313,11 @@ download_language_models() {
         chown "$CURRENT_USER":"$CURRENT_USER" "$DATA_DIR"
     fi
 
-    print_step "Downloading all language models (this may take 10-30 minutes)..."
-    # Run libretranslate once to download all models, then stop it
+    print_step "Downloading language models for: $LANGUAGES (this may take 5-15 minutes)..."
+    # Run libretranslate with --load-only to download only specified language models
     # Using timeout to prevent hanging - models download on first start
-    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && timeout 1800 libretranslate --update-models" > /dev/null 2>&1 || true
-    print_success "Language models downloaded"
+    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && source '$VENV_DIR/bin/activate' && timeout 1800 libretranslate --load-only $LANGUAGES --update-models" > /dev/null 2>&1 || true
+    print_success "Language models downloaded for: $LANGUAGES"
 }
 
 create_api_key() {
@@ -377,7 +406,7 @@ User=$CURRENT_USER
 Group=$CURRENT_USER
 WorkingDirectory=$INSTALL_DIR
 Environment="PATH=$VENV_DIR/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=$VENV_DIR/bin/libretranslate --host 127.0.0.1 --port $APP_PORT --api-keys --api-keys-db-path $INSTALL_DIR/api_keys.db --threads 4
+ExecStart=$VENV_DIR/bin/libretranslate --host 127.0.0.1 --port $APP_PORT --load-only $LANGUAGES --api-keys --api-keys-db-path $INSTALL_DIR/api_keys.db --threads 4
 Restart=always
 RestartSec=10
 
@@ -533,6 +562,7 @@ show_completion_message() {
 
     echo -e "${WHITE}Application Details:${NC}"
     echo -e "  ${CYAN}*${NC} Domain:        ${BOLD}https://$DOMAIN_NAME${NC}"
+    echo -e "  ${CYAN}*${NC} Languages:     ${BOLD}$LANGUAGES${NC}"
     echo -e "  ${CYAN}*${NC} Install path:  ${BOLD}$INSTALL_DIR${NC}"
     echo -e "  ${CYAN}*${NC} Virtual env:   ${BOLD}$VENV_DIR${NC}"
     echo ""
