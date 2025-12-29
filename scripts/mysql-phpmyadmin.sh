@@ -41,9 +41,8 @@ CURRENT_USER=""
 HOME_DIR=""
 INSTALL_DIR=""
 
-# Security options (will be set by command line arguments)
+# Security options
 ALLOWED_IP=""
-ENABLE_BASIC_AUTH="false"
 BASIC_AUTH_USER=""
 BASIC_AUTH_PASSWORD=""
 
@@ -52,20 +51,19 @@ BASIC_AUTH_PASSWORD=""
 #-------------------------------------------------------------------------------
 
 show_usage() {
-    echo "Usage: $0 <domain_name> [options]"
+    echo "Usage: $0 <domain_name> [allowed_ip]"
     echo ""
     echo "Arguments:"
     echo "  domain_name              The domain name for phpMyAdmin (e.g., db.example.com)"
+    echo "  allowed_ip               (Optional) Restrict access to specific IP address"
     echo ""
-    echo "Options:"
-    echo "  --allowed-ip <IP>        Restrict access to specific IP address"
-    echo "  --basic-auth             Enable HTTP Basic Authentication"
+    echo "Security:"
+    echo "  Basic Authentication is always enabled for security."
+    echo "  Credentials will be generated and saved to the credentials file."
     echo ""
     echo "Examples:"
     echo "  $0 db.example.com"
-    echo "  $0 db.example.com --allowed-ip 192.168.1.100"
-    echo "  $0 db.example.com --basic-auth"
-    echo "  $0 db.example.com --allowed-ip 192.168.1.100 --basic-auth"
+    echo "  $0 db.example.com 192.168.1.100"
     echo ""
     echo "Note: This script must be run as root or with sudo."
     exit 1
@@ -210,39 +208,19 @@ parse_arguments() {
 
     DOMAIN_NAME="$1"
     validate_domain "$DOMAIN_NAME"
-    shift
 
-    # Parse optional arguments
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --allowed-ip)
-                if [[ -z "$2" ]] || [[ "$2" == --* ]]; then
-                    print_error "--allowed-ip requires an IP address argument"
-                    show_usage
-                fi
-                ALLOWED_IP="$2"
-                validate_ip "$ALLOWED_IP"
-                shift 2
-                ;;
-            --basic-auth)
-                ENABLE_BASIC_AUTH="true"
-                shift
-                ;;
-            *)
-                print_error "Unknown option: $1"
-                show_usage
-                ;;
-        esac
-    done
+    # Check for optional IP address (second positional argument)
+    if [[ -n "$2" ]]; then
+        ALLOWED_IP="$2"
+        validate_ip "$ALLOWED_IP"
+    fi
 
     print_header "Configuration"
     print_success "Domain configured: $DOMAIN_NAME"
     if [[ -n "$ALLOWED_IP" ]]; then
         print_success "IP restriction enabled: $ALLOWED_IP"
     fi
-    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
-        print_success "Basic Authentication: enabled"
-    fi
+    print_success "Basic Authentication: enabled (mandatory)"
 }
 
 install_dependencies() {
@@ -556,14 +534,11 @@ configure_nginx() {
         print_info "IP restriction configured for: $ALLOWED_IP"
     fi
 
-    # Build Basic Auth directives
-    local BASIC_AUTH_DIRECTIVES=""
-    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
-        BASIC_AUTH_DIRECTIVES="
+    # Build Basic Auth directives (always enabled)
+    local BASIC_AUTH_DIRECTIVES="
         auth_basic \"phpMyAdmin\";
         auth_basic_user_file /etc/nginx/.htpasswd-phpmyadmin;"
-        print_info "Basic Authentication enabled"
-    fi
+    print_info "Basic Authentication enabled"
 
     print_step "Creating Nginx configuration..."
 
@@ -703,18 +678,14 @@ show_completion_message() {
     echo -e "  ${CYAN}*${NC} Password:          ${BOLD}$PMA_PASSWORD${NC}"
     echo ""
 
-    # Show security settings if configured
-    if [[ -n "$ALLOWED_IP" ]] || [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
-        echo -e "${WHITE}Security Settings:${NC}"
-        if [[ -n "$ALLOWED_IP" ]]; then
-            echo -e "  ${CYAN}*${NC} IP restriction:    ${BOLD}Access allowed only from $ALLOWED_IP${NC}"
-        fi
-        if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
-            echo -e "  ${CYAN}*${NC} Basic Auth user:   ${BOLD}$BASIC_AUTH_USER${NC}"
-            echo -e "  ${CYAN}*${NC} Basic Auth pass:   ${BOLD}$BASIC_AUTH_PASSWORD${NC}"
-        fi
-        echo ""
+    # Show security settings (Basic Auth is always enabled)
+    echo -e "${WHITE}Security Settings:${NC}"
+    if [[ -n "$ALLOWED_IP" ]]; then
+        echo -e "  ${CYAN}*${NC} IP restriction:    ${BOLD}Access allowed only from $ALLOWED_IP${NC}"
     fi
+    echo -e "  ${CYAN}*${NC} Basic Auth user:   ${BOLD}$BASIC_AUTH_USER${NC}"
+    echo -e "  ${CYAN}*${NC} Basic Auth pass:   ${BOLD}$BASIC_AUTH_PASSWORD${NC}"
+    echo ""
 
     echo -e "${WHITE}Service Management:${NC}"
     echo -e "  ${CYAN}*${NC} MySQL status:      ${BOLD}sudo systemctl status mysql${NC}"
@@ -725,23 +696,16 @@ show_completion_message() {
 
     echo -e "${YELLOW}Important:${NC}"
     echo -e "  ${CYAN}*${NC} Credentials are stored in: ${BOLD}$HOME_DIR/.mysql_credentials${NC}"
-    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
-        echo -e "  ${CYAN}*${NC} Basic Auth credentials: ${BOLD}$HOME_DIR/.phpmyadmin-auth${NC}"
-    fi
+    echo -e "  ${CYAN}*${NC} Basic Auth credentials: ${BOLD}$HOME_DIR/.phpmyadmin-auth${NC}"
     echo -e "  ${CYAN}*${NC} Please save the passwords in a secure location"
     echo -e "  ${CYAN}*${NC} Consider changing the default passwords after first login"
     echo ""
 
     echo -e "${YELLOW}Next Steps:${NC}"
     echo -e "  ${CYAN}1.${NC} Visit ${BOLD}https://$DOMAIN_NAME${NC} to access phpMyAdmin"
-    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
-        echo -e "  ${CYAN}2.${NC} Enter Basic Auth credentials when prompted"
-        echo -e "  ${CYAN}3.${NC} Log in to phpMyAdmin with MySQL credentials"
-        echo -e "  ${CYAN}4.${NC} Create databases and users as needed"
-    else
-        echo -e "  ${CYAN}2.${NC} Log in with the credentials shown above"
-        echo -e "  ${CYAN}3.${NC} Create databases and users as needed"
-    fi
+    echo -e "  ${CYAN}2.${NC} Enter Basic Auth credentials when prompted"
+    echo -e "  ${CYAN}3.${NC} Log in to phpMyAdmin with MySQL credentials"
+    echo -e "  ${CYAN}4.${NC} Create databases and users as needed"
     echo ""
 
     print_success "Thank you for using MySQL + phpMyAdmin installer!"
@@ -773,9 +737,7 @@ main() {
     if [[ -n "$ALLOWED_IP" ]]; then
         print_info "IP restriction: $ALLOWED_IP"
     fi
-    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
-        print_info "Basic Authentication: enabled"
-    fi
+    print_info "Basic Authentication: enabled (mandatory)"
     echo ""
 
     # Execute installation steps
@@ -785,10 +747,8 @@ main() {
     configure_phpmyadmin
     add_user_to_www_data
 
-    # Create htpasswd file if Basic Auth is enabled
-    if [[ "$ENABLE_BASIC_AUTH" == "true" ]]; then
-        create_htpasswd
-    fi
+    # Create htpasswd file for Basic Auth (always enabled)
+    create_htpasswd
 
     configure_nginx
     setup_ssl_certificate

@@ -26,14 +26,14 @@
   {
     "name": "mysql/phpmyadmin",
     "script_name": "mysql-phpmyadmin",
-    "description": "MySQL database server with phpMyAdmin web interface. Installs: Nginx, PHP-FPM with extensions, MySQL Server, phpMyAdmin, Certbot",
-    "info": "Required parameter: domain name"
+    "description": "MySQL database server with phpMyAdmin web interface. Installs: Nginx, PHP-FPM with extensions, MySQL Server, phpMyAdmin, Certbot, basic authentication",
+    "info": "Required parameters: domain name, IP address (optional)"
   },
   {
     "name": "mathesar-foundation/mathesar",
     "script_name": "postgresql-mathesar",
-    "description": "PostgreSQL database server with Mathesar web interface. Installs: Nginx, Certbot, PostgreSQL 16, Mathesar, systemd service",
-    "info": "Required parameter: domain name"
+    "description": "PostgreSQL database server with Mathesar web interface. Installs: Nginx, Certbot, PostgreSQL 16, Mathesar, systemd service, basic authentication",
+    "info": "Required parameters: domain name, IP address (optional)"
   },
   {
     "name": "gtsteffaniak/filebrowser",

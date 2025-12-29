@@ -27,8 +27,8 @@ This project provides a set of bash scripts for quick deployment of popular soft
 | `various-useful-api-django.sh` | A collection of useful APIs using Django | Git, Python 3, pip, venv, MySQL, Nginx, Certbot, Django, Gunicorn, FFmpeg, systemd service |
 | `openchatroulette.sh` | Video chat roulette with WebRTC | Git, Node.js, npm, Nginx, Certbot, Angular, GeoLite2-Country database, systemd service |
 | `pocketbase.sh` | Go backend with built-in SQLite database, authentication and admin dashboard | Nginx, Certbot, PocketBase, systemd service |
-| `mysql-phpmyadmin.sh` | MySQL database server with phpMyAdmin web interface | Nginx, PHP-FPM with extensions, MySQL Server, phpMyAdmin, Certbot |
-| `postgresql-mathesar.sh` | PostgreSQL database server with Mathesar web interface | Nginx, Certbot, PostgreSQL 16, Mathesar, systemd service |
+| `mysql-phpmyadmin.sh` | MySQL database server with phpMyAdmin web interface | Nginx, PHP-FPM with extensions, MySQL Server, phpMyAdmin, Certbot, basic authentication |
+| `postgresql-mathesar.sh` | PostgreSQL database server with Mathesar web interface | Nginx, Certbot, PostgreSQL 16, Mathesar, systemd service, basic authentication |
 | `filebrowser.sh` | Web file manager with modern interface | Nginx, Certbot, FileBrowser Quantum, systemd service |
 | `wireguard-wireguard-ui.sh` | WireGuard VPN server with web management interface | WireGuard, WireGuard-UI, Nginx, Certbot, IP forwarding configuration, systemd services |
 | `xray-3x-ui.sh` | Xray proxy server with 3x-ui web panel (VLESS, VMess, Trojan) | Xray, 3x-ui panel, Nginx, Certbot, systemd services |
