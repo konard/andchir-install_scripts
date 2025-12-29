@@ -110,6 +110,34 @@ def strip_ansi_codes(text: Optional[str]) -> Optional[str]:
     return result
 
 
+def escape_shell_args(additional: str) -> str:
+    """
+    Escape and format additional parameters for shell execution.
+
+    If the additional parameter contains spaces, it is split into multiple
+    arguments. Each argument is properly escaped and quoted with single quotes.
+
+    Args:
+        additional: The additional parameter string (may contain spaces)
+
+    Returns:
+        A properly escaped string of shell arguments
+    """
+    if not additional:
+        return ''
+
+    # Split by whitespace to get individual arguments
+    args = additional.split()
+
+    # Escape each argument: replace single quotes with '\''
+    escaped_args = []
+    for arg in args:
+        escaped_arg = arg.replace("'", "'\"'\"'")
+        escaped_args.append(f"'{escaped_arg}'")
+
+    return ' '.join(escaped_args)
+
+
 def get_task_file_path(task_id):
     """
     Get the full path to the task report file.
@@ -537,10 +565,10 @@ def execute_script_via_ssh(server_ip, server_root_password, script_name, additio
         script_url = f"{SCRIPTS_BASE_URL}/{script_name}.sh"
 
         if additional:
-            # Escape the additional parameter to prevent command injection
-            # Use single quotes and escape any single quotes within
-            escaped_additional = additional.replace("'", "'\"'\"'")
-            command = f"curl -fsSL -o- {script_url} | bash -s -- '{escaped_additional}'"
+            # Escape and format the additional parameter(s)
+            # If the value contains spaces, it is split into multiple arguments
+            escaped_args = escape_shell_args(additional)
+            command = f"curl -fsSL -o- {script_url} | bash -s -- {escaped_args}"
         else:
             command = f"curl -fsSL -o- {script_url} | bash"
 
@@ -622,8 +650,10 @@ def execute_script_via_ssh_async(task_id, server_ip, server_root_password, scrip
         script_url = f"{SCRIPTS_BASE_URL}/{script_name}.sh"
 
         if additional:
-            escaped_additional = additional.replace("'", "'\"'\"'")
-            command = f"curl -fsSL -o- {script_url} | bash -s -- '{escaped_additional}'"
+            # Escape and format the additional parameter(s)
+            # If the value contains spaces, it is split into multiple arguments
+            escaped_args = escape_shell_args(additional)
+            command = f"curl -fsSL -o- {script_url} | bash -s -- {escaped_args}"
         else:
             command = f"curl -fsSL -o- {script_url} | bash"
 
