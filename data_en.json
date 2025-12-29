@@ -112,5 +112,11 @@
     "script_name": "hive-mind",
     "description": "Hive Mind AI orchestrator with Telegram bot integration. Installs: Docker, Docker Compose, Hive Mind, Telegram Bot",
     "info": "Required parameters: Telegram bot token, Telegram group ID"
+  },
+  {
+    "name": "LibreTranslate/LibreTranslate",
+    "script_name": "libretranslate",
+    "description": "Free and open source machine translation API LibreTranslate. Installs: Git, Python 3, pip, venv, Nginx, Certbot, all language models, API key, systemd service",
+    "info": "Required parameter: domain name"
   }
 ]
