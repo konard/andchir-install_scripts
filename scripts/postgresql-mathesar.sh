@@ -50,18 +50,29 @@ DB_NAME="mathesar_django"
 DB_USER="mathesar"
 DB_PASSWORD=""
 
+# Security options
+ALLOWED_IP=""
+BASIC_AUTH_USER=""
+BASIC_AUTH_PASSWORD=""
+
 #-------------------------------------------------------------------------------
 # Helper functions
 #-------------------------------------------------------------------------------
 
 show_usage() {
-    echo "Usage: $0 <domain_name>"
+    echo "Usage: $0 <domain_name> [allowed_ip]"
     echo ""
     echo "Arguments:"
-    echo "  domain_name    The domain name for the application (e.g., mathesar.example.com)"
+    echo "  domain_name              The domain name for the application (e.g., mathesar.example.com)"
+    echo "  allowed_ip               (Optional) Restrict access to specific IP address"
     echo ""
-    echo "Example:"
+    echo "Security:"
+    echo "  Basic Authentication is always enabled for security."
+    echo "  Credentials will be generated and saved to the credentials file."
+    echo ""
+    echo "Examples:"
     echo "  $0 mathesar.example.com"
+    echo "  $0 mathesar.example.com 192.168.1.100"
     echo ""
     echo "Note: This script must be run as root or with sudo."
     exit 1
@@ -75,6 +86,25 @@ validate_domain() {
         print_info "Please enter a valid domain (e.g., mathesar.example.com)"
         exit 1
     fi
+}
+
+validate_ip() {
+    local ip="$1"
+    # IP address validation regex (IPv4)
+    if [[ ! "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        print_error "Invalid IP address format: $ip"
+        print_info "Please enter a valid IPv4 address (e.g., 192.168.1.100)"
+        exit 1
+    fi
+    # Validate each octet is 0-255
+    IFS='.' read -ra OCTETS <<< "$ip"
+    for octet in "${OCTETS[@]}"; do
+        if [[ $octet -gt 255 ]]; then
+            print_error "Invalid IP address format: $ip"
+            print_info "Each octet must be between 0 and 255"
+            exit 1
+        fi
+    done
 }
 
 print_header() {
@@ -183,8 +213,18 @@ parse_arguments() {
     DOMAIN_NAME="$1"
     validate_domain "$DOMAIN_NAME"
 
-    print_header "Domain Configuration"
+    # Check for optional IP address (second positional argument)
+    if [[ -n "$2" ]]; then
+        ALLOWED_IP="$2"
+        validate_ip "$ALLOWED_IP"
+    fi
+
+    print_header "Configuration"
     print_success "Domain configured: $DOMAIN_NAME"
+    if [[ -n "$ALLOWED_IP" ]]; then
+        print_success "IP restriction enabled: $ALLOWED_IP"
+    fi
+    print_success "Basic Authentication: enabled (mandatory)"
 }
 
 install_dependencies() {
@@ -198,7 +238,7 @@ install_dependencies() {
     print_success "Package lists updated"
 
     print_step "Installing required packages..."
-    apt-get install -y -qq curl wget gnupg2 lsb-release > /dev/null 2>&1
+    apt-get install -y -qq curl wget gnupg2 lsb-release apache2-utils > /dev/null 2>&1
     print_success "Core utilities installed"
 
     print_step "Installing Nginx..."
@@ -438,6 +478,46 @@ EOF
     fi
 }
 
+create_htpasswd() {
+    print_header "Creating Basic Authentication"
+
+    HTPASSWD_FILE="/etc/nginx/.htpasswd-mathesar"
+
+    # Check if htpasswd file already exists
+    if [[ -f "$HTPASSWD_FILE" ]]; then
+        print_info "Authentication file already exists"
+        print_step "Skipping password generation to preserve existing credentials..."
+
+        # Read existing username from file
+        BASIC_AUTH_USER=$(head -1 "$HTPASSWD_FILE" | cut -d':' -f1)
+        BASIC_AUTH_PASSWORD="(stored in $HTPASSWD_FILE)"
+        export BASIC_AUTH_USER BASIC_AUTH_PASSWORD
+        print_success "Using existing authentication configuration"
+        return
+    fi
+
+    BASIC_AUTH_USER="admin"
+    BASIC_AUTH_PASSWORD=$(generate_password)
+
+    print_step "Creating htpasswd file for basic authentication..."
+    htpasswd -bc "$HTPASSWD_FILE" "$BASIC_AUTH_USER" "$BASIC_AUTH_PASSWORD" > /dev/null 2>&1
+    chmod 640 "$HTPASSWD_FILE"
+    chown root:www-data "$HTPASSWD_FILE"
+    print_success "Authentication file created"
+
+    # Store credentials for reference
+    CREDENTIALS_FILE="$HOME_DIR/.mathesar-auth"
+    cat > "$CREDENTIALS_FILE" << EOF
+BASIC_AUTH_USER=$BASIC_AUTH_USER
+BASIC_AUTH_PASSWORD=$BASIC_AUTH_PASSWORD
+EOF
+    chown "$CURRENT_USER":"$CURRENT_USER" "$CREDENTIALS_FILE"
+    chmod 600 "$CREDENTIALS_FILE"
+    print_success "Credentials saved to $CREDENTIALS_FILE"
+
+    export BASIC_AUTH_USER BASIC_AUTH_PASSWORD
+}
+
 configure_nginx() {
     print_header "Configuring Nginx"
 
@@ -450,6 +530,22 @@ configure_nginx() {
         return
     fi
 
+    # Build IP restriction directives
+    local IP_RESTRICTION=""
+    if [[ -n "$ALLOWED_IP" ]]; then
+        IP_RESTRICTION="
+    # IP address restriction
+    allow $ALLOWED_IP;
+    deny all;"
+        print_info "IP restriction configured for: $ALLOWED_IP"
+    fi
+
+    # Build Basic Auth directives (always enabled)
+    local BASIC_AUTH_DIRECTIVES="
+        auth_basic \"Mathesar\";
+        auth_basic_user_file /etc/nginx/.htpasswd-mathesar;"
+    print_info "Basic Authentication enabled"
+
     print_step "Creating Nginx configuration..."
 
     tee /etc/nginx/sites-available/$DOMAIN_NAME > /dev/null << EOF
@@ -459,6 +555,7 @@ server {
 
     access_log /var/log/nginx/${DOMAIN_NAME}_access.log;
     error_log /var/log/nginx/${DOMAIN_NAME}_error.log;
+$IP_RESTRICTION
 
     # Static files
     location /static/ {
@@ -474,7 +571,7 @@ server {
         add_header Cache-Control "public, no-transform";
     }
 
-    location / {
+    location / {$BASIC_AUTH_DIRECTIVES
         proxy_pass http://127.0.0.1:$APP_PORT;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -594,6 +691,15 @@ show_completion_message() {
     echo -e "  ${CYAN}•${NC} Password:      ${BOLD}$DB_PASSWORD${NC}"
     echo ""
 
+    # Show security settings (Basic Auth is always enabled)
+    echo -e "${WHITE}Security Settings:${NC}"
+    if [[ -n "$ALLOWED_IP" ]]; then
+        echo -e "  ${CYAN}•${NC} IP restriction: ${BOLD}Access allowed only from $ALLOWED_IP${NC}"
+    fi
+    echo -e "  ${CYAN}•${NC} Basic Auth user: ${BOLD}$BASIC_AUTH_USER${NC}"
+    echo -e "  ${CYAN}•${NC} Basic Auth pass: ${BOLD}$BASIC_AUTH_PASSWORD${NC}"
+    echo ""
+
     echo -e "${WHITE}Access:${NC}"
     echo -e "  ${CYAN}•${NC} Web URL:       ${BOLD}https://$DOMAIN_NAME${NC}"
     echo ""
@@ -611,15 +717,17 @@ show_completion_message() {
 
     echo -e "${YELLOW}Important:${NC}"
     echo -e "  ${CYAN}•${NC} Database credentials are stored in: ${BOLD}$INSTALL_DIR/.env${NC}"
+    echo -e "  ${CYAN}•${NC} Basic Auth credentials: ${BOLD}$HOME_DIR/.mathesar-auth${NC}"
     echo -e "  ${CYAN}•${NC} Please save the database password in a secure location"
     echo -e "  ${CYAN}•${NC} On first access, you will need to create an admin account"
     echo ""
 
     echo -e "${YELLOW}Next Steps:${NC}"
     echo -e "  ${CYAN}1.${NC} Visit ${BOLD}https://$DOMAIN_NAME${NC} to access Mathesar"
-    echo -e "  ${CYAN}2.${NC} Create your admin account on first login"
-    echo -e "  ${CYAN}3.${NC} Connect to your PostgreSQL databases and start exploring"
-    echo -e "  ${CYAN}4.${NC} Check ${BOLD}https://docs.mathesar.org${NC} for documentation"
+    echo -e "  ${CYAN}2.${NC} Enter Basic Auth credentials when prompted"
+    echo -e "  ${CYAN}3.${NC} Create your admin account on first login"
+    echo -e "  ${CYAN}4.${NC} Connect to your PostgreSQL databases and start exploring"
+    echo -e "  ${CYAN}5.${NC} Check ${BOLD}https://docs.mathesar.org${NC} for documentation"
     echo ""
 
     print_success "Thank you for using PostgreSQL + Mathesar!"
@@ -648,6 +756,10 @@ main() {
     print_info "Starting installation. This may take several minutes..."
     print_info "Domain: $DOMAIN_NAME"
     print_info "User: $CURRENT_USER"
+    if [[ -n "$ALLOWED_IP" ]]; then
+        print_info "IP restriction: $ALLOWED_IP"
+    fi
+    print_info "Basic Authentication: enabled (mandatory)"
     echo ""
 
     # Execute installation steps
@@ -658,6 +770,10 @@ main() {
     create_env_file
     add_user_to_www_data
     create_systemd_service
+
+    # Create htpasswd file for Basic Auth (always enabled)
+    create_htpasswd
+
     configure_nginx
     setup_ssl_certificate
 

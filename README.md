@@ -27,8 +27,8 @@
 | `various-useful-api-django.sh` | Набор полезных API с использованием Django | Git, Python 3, pip, venv, MySQL, Nginx, Certbot, Django, Gunicorn, FFmpeg, systemd-сервис |
 | `openchatroulette.sh` | Видео чат-рулетка с WebRTC | Git, Node.js, npm, Nginx, Certbot, Angular, база данных GeoLite2-Country, systemd-сервис |
 | `pocketbase.sh` | Бэкенд на Go с встроенной базой данных SQLite, аутентификацией и админ-панелью | Nginx, Certbot, PocketBase, systemd-сервис |
-| `mysql-phpmyadmin.sh` | Сервер базы данных MySQL с веб-интерфейсом phpMyAdmin | Nginx, PHP-FPM с расширениями, MySQL Server, phpMyAdmin, Certbot |
-| `postgresql-mathesar.sh` | Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar | Nginx, Certbot, PostgreSQL 16, Mathesar, systemd-сервис |
+| `mysql-phpmyadmin.sh` | Сервер базы данных MySQL с веб-интерфейсом phpMyAdmin | Nginx, PHP-FPM с расширениями, MySQL Server, phpMyAdmin, Certbot, базовая аутентификация |
+| `postgresql-mathesar.sh` | Сервер базы данных PostgreSQL с веб-интерфейсом Mathesar | Nginx, Certbot, PostgreSQL 16, Mathesar, systemd-сервис, базовая аутентификация |
 | `filebrowser.sh` | Веб-файловый менеджер с современным интерфейсом | Nginx, Certbot, FileBrowser Quantum, systemd-сервис |
 | `wireguard-wireguard-ui.sh` | VPN-сервер WireGuard с веб-интерфейсом для управления | WireGuard, WireGuard-UI, Nginx, Certbot, настройка IP-форвардинга, systemd-сервисы |
 | `xray-3x-ui.sh` | Xray прокси-сервер с веб-панелью 3x-ui (VLESS, VMess, Trojan) | Xray, панель 3x-ui, Nginx, Certbot, systemd-сервисы |
