@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# n8n Management Script
+# Usage: ./manage.sh [command]
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+case "$1" in
+    start)
+        echo "Starting n8n..."
+        docker compose up -d
+        ;;
+    stop)
+        echo "Stopping n8n..."
+        docker compose down
+        ;;
+    restart)
+        echo "Restarting n8n..."
+        docker compose restart
+        ;;
+    logs)
+        docker compose logs -f "${2:-n8n}"
+        ;;
+    status)
+        docker compose ps
+        ;;
+    update)
+        echo "Updating n8n..."
+        docker compose pull
+        docker compose up -d
+        ;;
+    backup)
+        BACKUP_DIR="$SCRIPT_DIR/backups"
+        BACKUP_NAME="n8n-backup-$(date +%Y%m%d-%H%M%S)"
+        mkdir -p "$BACKUP_DIR"
+        echo "Creating backup: $BACKUP_NAME"
+        docker compose exec -T postgres pg_dump -U n8n n8n > "$BACKUP_DIR/$BACKUP_NAME.sql"
+        echo "Backup saved to: $BACKUP_DIR/$BACKUP_NAME.sql"
+        ;;
+    *)
+        echo "n8n Management Script"
+        echo ""
+        echo "Usage: $0 {start|stop|restart|logs|status|update|backup}"
+        echo ""
+        echo "Commands:"
+        echo "  start    - Start n8n containers"
+        echo "  stop     - Stop n8n containers"
+        echo "  restart  - Restart n8n containers"
+        echo "  logs     - Show logs (optional: logs postgres)"
+        echo "  status   - Show container status"
+        echo "  update   - Update n8n to latest version"
+        echo "  backup   - Backup PostgreSQL database"
+        ;;
+esac

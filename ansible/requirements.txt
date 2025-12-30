@@ -1,0 +1,4 @@
+# Ansible requirements for install_scripts
+# Install with: pip install -r requirements.txt
+
+ansible>=10.0.0

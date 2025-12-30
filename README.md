@@ -57,6 +57,35 @@ curl -fsSL -o- https://raw.githubusercontent.com/andchir/install_scripts/refs/he
 curl -fsSL -o- https://raw.githubusercontent.com/andchir/install_scripts/refs/heads/main/scripts/pocketbase.sh | bash -s -- example.com
 ```
 
+### Использование Ansible
+
+Для некоторого ПО доступны Ansible playbook'и, которые позволяют автоматизировать установку с использованием Ansible.
+
+**Установка Ansible:**
+
+```bash
+cd ansible
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Доступные playbook'и:**
+- `ansible/playbooks/n8n.yml` - установка n8n с PostgreSQL
+
+**Пример использования:**
+
+```bash
+# Настройте inventory файл
+cp ansible/inventory.ini.example ansible/inventory.ini
+# Отредактируйте inventory.ini, указав ваш сервер
+
+# Запустите playbook
+ansible-playbook -i ansible/inventory.ini ansible/playbooks/n8n.yml -e "domain_name=n8n.example.com"
+```
+
+Подробная документация по использованию Ansible playbook'ов находится в файле [ansible/README.md](ansible/README.md).
+
 ### Использование через API
 
 Проект включает Flask API для управления скриптами и удалённой установки ПО.

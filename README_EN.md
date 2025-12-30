@@ -57,6 +57,35 @@ Example:
 curl -fsSL -o- https://raw.githubusercontent.com/andchir/install_scripts/refs/heads/main/scripts/pocketbase.sh | bash -s -- example.com
 ```
 
+### Using Ansible
+
+For some software, Ansible playbooks are available that allow you to automate installation using Ansible.
+
+**Installing Ansible:**
+
+```bash
+cd ansible
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+**Available playbooks:**
+- `ansible/playbooks/n8n.yml` - n8n installation with PostgreSQL
+
+**Usage example:**
+
+```bash
+# Configure inventory file
+cp ansible/inventory.ini.example ansible/inventory.ini
+# Edit inventory.ini with your server details
+
+# Run the playbook
+ansible-playbook -i ansible/inventory.ini ansible/playbooks/n8n.yml -e "domain_name=n8n.example.com"
+```
+
+Detailed documentation on using Ansible playbooks can be found in [ansible/README.md](ansible/README.md).
+
 ### Using via API
 
 The project includes a Flask API for managing scripts and remote software installation.

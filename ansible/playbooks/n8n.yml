@@ -1,0 +1,392 @@
+---
+#===============================================================================
+#
+#   n8n + PostgreSQL - Automated Installation Playbook
+#   For Ubuntu 24.04 LTS
+#
+#   This playbook automatically installs and configures:
+#   - Docker and Docker Compose
+#   - PostgreSQL 16 database (via Docker)
+#   - n8n workflow automation platform (via Docker)
+#   - Nginx as reverse proxy
+#   - SSL certificate via Let's Encrypt
+#
+#   Repository: https://github.com/n8n-io/n8n
+#   Documentation: https://docs.n8n.io/hosting/installation/docker/
+#
+#   Usage:
+#     ansible-playbook -i inventory.ini n8n.yml -e "domain_name=n8n.example.com"
+#
+#===============================================================================
+
+- name: Install n8n + PostgreSQL
+  hosts: all
+  become: true
+
+  vars:
+    app_name: "n8n"
+    service_name: "n8n"
+    installer_user: "installer_user"
+    app_port: "5678"
+    postgresql_version: "16"
+    db_name: "n8n"
+    db_user: "n8n"
+
+  tasks:
+    #---------------------------------------------------------------------------
+    # Validate domain name
+    #---------------------------------------------------------------------------
+    - name: Check if domain_name is provided
+      ansible.builtin.fail:
+        msg: "domain_name variable is required. Use: -e 'domain_name=n8n.example.com'"
+      when: domain_name is not defined or domain_name == ""
+
+    - name: Display installation info
+      ansible.builtin.debug:
+        msg: |
+          ═══════════════════════════════════════════════════════════════════
+          n8n + PostgreSQL Automated Installation
+          ═══════════════════════════════════════════════════════════════════
+          Domain: {{ domain_name }}
+          PostgreSQL version: {{ postgresql_version }}
+          ═══════════════════════════════════════════════════════════════════
+
+    #---------------------------------------------------------------------------
+    # Setup installer user
+    #---------------------------------------------------------------------------
+    - name: Create installer user
+      ansible.builtin.user:
+        name: "{{ installer_user }}"
+        shell: /bin/bash
+        create_home: true
+        state: present
+
+    - name: Add installer user to sudo group
+      ansible.builtin.user:
+        name: "{{ installer_user }}"
+        groups: sudo
+        append: true
+
+    - name: Set installation directory variable
+      ansible.builtin.set_fact:
+        install_dir: "/home/{{ installer_user }}/{{ app_name }}"
+
+    #---------------------------------------------------------------------------
+    # Install system dependencies
+    #---------------------------------------------------------------------------
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install required system packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - wget
+          - gnupg2
+          - lsb-release
+          - ca-certificates
+          - apt-transport-https
+          - software-properties-common
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    #---------------------------------------------------------------------------
+    # Install Docker
+    #---------------------------------------------------------------------------
+    - name: Check if Docker is installed
+      ansible.builtin.command: docker --version
+      register: docker_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Create keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+      when: docker_check.rc != 0
+
+    - name: Add Docker GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+      when: docker_check.rc != 0
+
+    - name: Get Ubuntu codename
+      ansible.builtin.command: lsb_release -cs
+      register: ubuntu_codename
+      changed_when: false
+
+    - name: Add Docker repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ubuntu_codename.stdout }} stable"
+        state: present
+        filename: docker
+      when: docker_check.rc != 0
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+      when: docker_check.rc != 0
+
+    - name: Start and enable Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add installer user to docker group
+      ansible.builtin.user:
+        name: "{{ installer_user }}"
+        groups: docker
+        append: true
+
+    #---------------------------------------------------------------------------
+    # Create installation directory
+    #---------------------------------------------------------------------------
+    - name: Create installation directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ installer_user }}"
+        group: "{{ installer_user }}"
+        mode: '0755'
+      loop:
+        - "{{ install_dir }}"
+        - "{{ install_dir }}/data/postgres"
+        - "{{ install_dir }}/data/n8n"
+
+    #---------------------------------------------------------------------------
+    # Generate credentials
+    #---------------------------------------------------------------------------
+    - name: Check if .env file exists
+      ansible.builtin.stat:
+        path: "{{ install_dir }}/.env"
+      register: env_file
+
+    - name: Generate database password
+      ansible.builtin.set_fact:
+        db_password: "{{ lookup('password', '/dev/null length=20 chars=ascii_letters,digits') }}"
+      when: not env_file.stat.exists
+
+    - name: Generate database root password
+      ansible.builtin.set_fact:
+        db_root_password: "{{ lookup('password', '/dev/null length=20 chars=ascii_letters,digits') }}"
+      when: not env_file.stat.exists
+
+    - name: Generate n8n encryption key
+      ansible.builtin.command: openssl rand -hex 32
+      register: encryption_key_result
+      changed_when: false
+      when: not env_file.stat.exists
+
+    - name: Set encryption key fact
+      ansible.builtin.set_fact:
+        n8n_encryption_key: "{{ encryption_key_result.stdout }}"
+      when: not env_file.stat.exists
+
+    - name: Read existing .env file
+      ansible.builtin.slurp:
+        src: "{{ install_dir }}/.env"
+      register: existing_env
+      when: env_file.stat.exists
+
+    - name: Parse existing credentials
+      ansible.builtin.set_fact:
+        db_password: "{{ (existing_env.content | b64decode | regex_search('POSTGRES_PASSWORD=(.+)', '\\1'))[0] }}"
+        db_root_password: "{{ (existing_env.content | b64decode | regex_search('POSTGRES_ROOT_PASSWORD=(.+)', '\\1'))[0] }}"
+        n8n_encryption_key: "{{ (existing_env.content | b64decode | regex_search('N8N_ENCRYPTION_KEY=(.+)', '\\1'))[0] }}"
+      when: env_file.stat.exists
+
+    #---------------------------------------------------------------------------
+    # Create environment file
+    #---------------------------------------------------------------------------
+    - name: Create .env file
+      ansible.builtin.template:
+        src: templates/n8n.env.j2
+        dest: "{{ install_dir }}/.env"
+        owner: "{{ installer_user }}"
+        group: "{{ installer_user }}"
+        mode: '0600'
+
+    #---------------------------------------------------------------------------
+    # Create docker-compose.yml
+    #---------------------------------------------------------------------------
+    - name: Check if docker-compose.yml exists
+      ansible.builtin.stat:
+        path: "{{ install_dir }}/docker-compose.yml"
+      register: compose_file
+
+    - name: Create docker-compose.yml
+      ansible.builtin.template:
+        src: templates/n8n.docker-compose.yml.j2
+        dest: "{{ install_dir }}/docker-compose.yml"
+        owner: "{{ installer_user }}"
+        group: "{{ installer_user }}"
+        mode: '0644'
+      when: not compose_file.stat.exists
+
+    #---------------------------------------------------------------------------
+    # Start Docker containers
+    #---------------------------------------------------------------------------
+    - name: Pull Docker images
+      ansible.builtin.command:
+        cmd: docker compose pull
+        chdir: "{{ install_dir }}"
+      become_user: "{{ installer_user }}"
+      changed_when: true
+
+    - name: Start Docker containers
+      ansible.builtin.command:
+        cmd: docker compose up -d
+        chdir: "{{ install_dir }}"
+      become_user: "{{ installer_user }}"
+      changed_when: true
+
+    - name: Wait for n8n to be ready
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ app_port }}/healthz"
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 30
+      delay: 2
+      ignore_errors: true
+
+    #---------------------------------------------------------------------------
+    # Configure user permissions
+    #---------------------------------------------------------------------------
+    - name: Add installer user to www-data group
+      ansible.builtin.user:
+        name: "{{ installer_user }}"
+        groups: www-data
+        append: true
+
+    - name: Add www-data to installer user group
+      ansible.builtin.user:
+        name: www-data
+        groups: "{{ installer_user }}"
+        append: true
+
+    #---------------------------------------------------------------------------
+    # Configure Nginx
+    #---------------------------------------------------------------------------
+    - name: Check if SSL certificate exists
+      ansible.builtin.stat:
+        path: "/etc/letsencrypt/live/{{ domain_name }}"
+      register: ssl_cert
+
+    - name: Create Nginx configuration
+      ansible.builtin.template:
+        src: templates/n8n.nginx.conf.j2
+        dest: "/etc/nginx/sites-available/{{ domain_name }}"
+        mode: '0644'
+      when: not ssl_cert.stat.exists
+
+    - name: Enable Nginx site
+      ansible.builtin.file:
+        src: "/etc/nginx/sites-available/{{ domain_name }}"
+        dest: "/etc/nginx/sites-enabled/{{ domain_name }}"
+        state: link
+      when: not ssl_cert.stat.exists
+      notify: Restart Nginx
+
+    - name: Test Nginx configuration
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    #---------------------------------------------------------------------------
+    # Setup SSL certificate
+    #---------------------------------------------------------------------------
+    - name: Obtain SSL certificate
+      ansible.builtin.command: >
+        certbot --nginx -d {{ domain_name }}
+        --non-interactive --agree-tos
+        --register-unsafely-without-email --redirect
+      when: not ssl_cert.stat.exists
+      register: certbot_result
+      ignore_errors: true
+
+    - name: Enable certbot timer
+      ansible.builtin.systemd:
+        name: certbot.timer
+        state: started
+        enabled: true
+
+    #---------------------------------------------------------------------------
+    # Create management script
+    #---------------------------------------------------------------------------
+    - name: Create management script
+      ansible.builtin.template:
+        src: templates/n8n.manage.sh.j2
+        dest: "{{ install_dir }}/manage.sh"
+        owner: "{{ installer_user }}"
+        group: "{{ installer_user }}"
+        mode: '0755'
+
+    #---------------------------------------------------------------------------
+    # Display completion message
+    #---------------------------------------------------------------------------
+    - name: Display installation summary
+      ansible.builtin.debug:
+        msg: |
+          ═══════════════════════════════════════════════════════════════════
+          ✔ Installation Completed Successfully!
+          ═══════════════════════════════════════════════════════════════════
+
+          Application Details:
+            • Domain:           https://{{ domain_name }}
+            • Install path:     {{ install_dir }}
+
+          PostgreSQL Database:
+            • Host:             postgres (Docker internal)
+            • Port:             5432
+            • Database:         {{ db_name }}
+            • User:             {{ db_user }}
+            • Password:         {{ db_password }}
+
+          n8n Configuration:
+            • Web URL:          https://{{ domain_name }}
+            • Internal port:    {{ app_port }}
+
+          Management Commands:
+            • Check status:     cd {{ install_dir }} && docker compose ps
+            • View logs:        cd {{ install_dir }} && docker compose logs -f
+            • Restart:          cd {{ install_dir }} && docker compose restart
+            • Update:           cd {{ install_dir }} && docker compose pull && docker compose up -d
+
+          Management Script:
+            • Start:            {{ install_dir }}/manage.sh start
+            • Stop:             {{ install_dir }}/manage.sh stop
+            • Logs:             {{ install_dir }}/manage.sh logs
+            • Backup:           {{ install_dir }}/manage.sh backup
+
+          Important:
+            • Credentials are stored in: {{ install_dir }}/.env
+            • Please save the database password in a secure location
+            • On first access, you will need to create an owner account
+
+          Next Steps:
+            1. Visit https://{{ domain_name }} to access n8n
+            2. Create your owner account on first login
+            3. Start building your automation workflows
+            4. Check https://docs.n8n.io for documentation
+          ═══════════════════════════════════════════════════════════════════
+
+  handlers:
+    - name: Restart Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
