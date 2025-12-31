@@ -742,6 +742,15 @@ get_php_fpm_socket() {
 configure_gzip_compression() {
     print_step "Configuring gzip compression..."
 
+    # Check if gzip.conf exists and contains the problematic 'gzip on;' directive
+    # If it does, remove it so we can recreate it with the correct configuration
+    if [[ -f "${NGINX_CONF_DIR}/conf.d/gzip.conf" ]] && grep -q "^[[:space:]]*gzip[[:space:]]\+on;" "${NGINX_CONF_DIR}/conf.d/gzip.conf"; then
+        print_warning "Outdated gzip configuration detected (contains duplicate 'gzip on;' directive)"
+        print_step "Removing old gzip.conf to recreate with correct configuration..."
+        rm -f "${NGINX_CONF_DIR}/conf.d/gzip.conf"
+        print_success "Old gzip configuration removed"
+    fi
+
     # Create gzip configuration file if it doesn't exist
     if [[ ! -f "${NGINX_CONF_DIR}/conf.d/gzip.conf" ]]; then
         cat > "${NGINX_CONF_DIR}/conf.d/gzip.conf" << 'GZIPCONF'
