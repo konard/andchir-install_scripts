@@ -12,7 +12,7 @@
 #   - Nginx as reverse proxy with basic authentication
 #   - SSL certificate via Let's Encrypt
 #
-#   Repository: https://github.com/tariqbuilds/linux-dash
+#   Repository: https://github.com/andchir/linux-dash2
 #
 #===============================================================================
 
@@ -244,123 +244,20 @@ clone_repository() {
     print_info "Working directory: $INSTALL_DIR"
 }
 
-create_python3_server() {
-    print_header "Creating Python 3 Server"
+verify_python3_server() {
+    print_header "Verifying Python 3 Server"
 
-    print_step "Creating Python 3 compatible server script..."
+    print_step "Checking for python3.py in repository..."
 
-    # The original index.py uses Python 2 syntax. Create a Python 3 version.
-    tee "$INSTALL_DIR/app/server/server_py3.py" > /dev/null << 'PYEOF'
-#!/usr/bin/env python3
-"""
-Python 3 compatible server for linux-dash.
-Based on the original index.py but updated for Python 3.
-"""
-
-import os
-import sys
-import subprocess
-import argparse
-import mimetypes
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from socketserver import ThreadingMixIn
-
-parser = argparse.ArgumentParser(description='Simple Threaded HTTP server to run linux-dash.')
-parser.add_argument('--port', metavar='PORT', type=int, nargs='?', default=80,
-                    help='Port to run the server on.')
-parser.add_argument('--host', metavar='HOST', type=str, nargs='?', default='127.0.0.1',
-                    help='Host to bind the server to.')
-
-modulesSubPath = '/server/linux_json_api.sh'
-appRootPath = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-
-class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
-    pass
-
-class MainHandler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        # Log to stdout for systemd journal capture
-        sys.stdout.write("%s - - [%s] %s\n" % (self.address_string(),
-                         self.log_date_time_string(), format % args))
-        sys.stdout.flush()
-
-    def do_GET(self):
-        try:
-            data = b''
-            contentType = 'text/html'
-
-            if self.path.startswith("/server/"):
-                # API calls for system metrics
-                try:
-                    module = self.path.split('=')[1]
-                    cmd = appRootPath + modulesSubPath + " " + module
-                    output = subprocess.Popen(
-                        cmd,
-                        shell=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE)
-                    data, _ = output.communicate()
-                    contentType = 'application/json'
-                except (IndexError, Exception) as e:
-                    data = b'{"error": "Invalid request"}'
-                    contentType = 'application/json'
-            else:
-                # Static file serving
-                if self.path == '/':
-                    filePath = 'index.html'
-                else:
-                    filePath = self.path.lstrip('/')
-
-                fullPath = os.path.join(appRootPath, filePath)
-
-                # Security: prevent directory traversal
-                if '..' in filePath:
-                    self.send_error(403, 'Forbidden')
-                    return
-
-                if os.path.isfile(fullPath):
-                    with open(fullPath, 'rb') as f:
-                        data = f.read()
-
-                    # Determine content type
-                    mimeType, _ = mimetypes.guess_type(fullPath)
-                    if mimeType:
-                        contentType = mimeType
-                    elif filePath.endswith('.css'):
-                        contentType = 'text/css'
-                    elif filePath.endswith('.js'):
-                        contentType = 'application/javascript'
-                    elif filePath.endswith('.json'):
-                        contentType = 'application/json'
-                else:
-                    self.send_error(404, 'File Not Found: %s' % self.path)
-                    return
-
-            self.send_response(200)
-            self.send_header('Content-type', contentType)
-            self.send_header('Content-Length', len(data))
-            self.end_headers()
-            self.wfile.write(data)
-
-        except IOError as e:
-            self.send_error(404, 'File Not Found: %s' % self.path)
-
-if __name__ == '__main__':
-    args = parser.parse_args()
-    server = ThreadedHTTPServer((args.host, args.port), MainHandler)
-    print(f'Starting linux-dash server on {args.host}:{args.port}')
-    print('Use <Ctrl-C> to stop')
-    sys.stdout.flush()
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print('\nShutting down server...')
-        server.shutdown()
-PYEOF
-
-    chown "$CURRENT_USER":"$CURRENT_USER" "$INSTALL_DIR/app/server/server_py3.py"
-    chmod +x "$INSTALL_DIR/app/server/server_py3.py"
-    print_success "Python 3 server script created"
+    if [[ -f "$INSTALL_DIR/app/server/python3.py" ]]; then
+        print_success "Found python3.py from repository"
+        chmod +x "$INSTALL_DIR/app/server/python3.py"
+        print_success "Python 3 server verified"
+    else
+        print_error "python3.py not found in repository"
+        print_error "Expected location: $INSTALL_DIR/app/server/python3.py"
+        exit 1
+    fi
 }
 
 create_systemd_service() {
@@ -376,8 +273,8 @@ After=network.target
 [Service]
 Type=simple
 User=$CURRENT_USER
-WorkingDirectory=$INSTALL_DIR/app/server
-ExecStart=/usr/bin/python3 $INSTALL_DIR/app/server/server_py3.py --host 127.0.0.1 --port $APP_PORT
+WorkingDirectory=$INSTALL_DIR/app
+ExecStart=/usr/bin/python3 $INSTALL_DIR/app/server/python3.py --port $APP_PORT
 Restart=on-failure
 RestartSec=10
 StandardOutput=syslog
@@ -669,7 +566,7 @@ main() {
     # Execute installation steps
     install_dependencies
     clone_repository
-    create_python3_server
+    verify_python3_server
     add_user_to_www_data
     create_htpasswd
     create_systemd_service
