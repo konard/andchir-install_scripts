@@ -747,9 +747,8 @@ configure_gzip_compression() {
         cat > "${NGINX_CONF_DIR}/conf.d/gzip.conf" << 'GZIPCONF'
 # Gzip compression configuration
 # Credit: https://github.com/h5bp/server-configs-nginx/
-
-# Enable gzip compression
-gzip on;
+# Note: The main 'gzip on;' directive is already enabled in /etc/nginx/nginx.conf
+# This file only adds additional gzip settings
 
 # Compression level (1-9)
 # 6 is a good compromise between size and CPU usage, offering about 75%
