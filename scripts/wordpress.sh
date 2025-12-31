@@ -245,7 +245,7 @@ install_dependencies() {
     print_success "Certbot installed"
 
     print_step "Installing additional utilities..."
-    apt-get install -y -qq wget curl unzip bc > /dev/null 2>&1
+    apt-get install -y -qq wget curl unzip bc rsync > /dev/null 2>&1
     print_success "Additional utilities installed"
 
     print_success "All system dependencies installed successfully!"
