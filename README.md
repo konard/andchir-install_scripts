@@ -43,6 +43,7 @@
 | `teable.sh` | Платформа электронных таблиц с функциями базы данных Teable | Docker, Docker Compose, PostgreSQL 15, Redis 7, Teable, Nginx, Certbot |
 | `hive-mind.sh` | AI-оркестратор Hive Mind с Telegram-ботом | Docker, Docker Compose, Hive Mind, Telegram Bot, Nginx, Certbot |
 | `libretranslate.sh` | Бесплатный API машинного перевода LibreTranslate | Git, Python 3, pip, venv, Nginx, Certbot, выбранные языковые модели (по умолчанию: en,de,ru), API ключ, systemd-сервис |
+| `odoo.sh` | Система управления бизнесом Odoo (ERP и CRM) | Git, Python 3, pip, venv, PostgreSQL 16, Nginx, Certbot, Odoo 18.0, Node.js, rtlcss, wkhtmltopdf, systemd-сервис |
 
 ## Использование
 

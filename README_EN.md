@@ -43,6 +43,7 @@ This project provides a set of bash scripts for quick deployment of popular soft
 | `teable.sh` | Spreadsheet-database platform Teable | Docker, Docker Compose, PostgreSQL 15, Redis 7, Teable, Nginx, Certbot |
 | `hive-mind.sh` | Hive Mind AI orchestrator with Telegram bot | Docker, Docker Compose, Hive Mind, Telegram Bot, Nginx, Certbot |
 | `libretranslate.sh` | Free and open source machine translation API LibreTranslate | Git, Python 3, pip, venv, Nginx, Certbot, selected language models (default: en,de,ru), API key, systemd service |
+| `odoo.sh` | Odoo business management system (ERP and CRM) | Git, Python 3, pip, venv, PostgreSQL 16, Nginx, Certbot, Odoo 18.0, Node.js, rtlcss, wkhtmltopdf, systemd service |
 
 ## Usage
 
