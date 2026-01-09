@@ -118,5 +118,11 @@
     "script_name": "libretranslate",
     "description": "Free and open source machine translation API LibreTranslate. Installs: Git, Python 3, pip, venv, Nginx, Certbot, selected language models, API key, systemd service",
     "info": "Required parameters: domain name, languages list (optional, default: en,de,ru)"
+  },
+  {
+    "name": "odoo/odoo",
+    "script_name": "odoo",
+    "description": "Odoo business management system (ERP and CRM). Installs: Git, Python 3, pip, venv, PostgreSQL 16, Nginx, Certbot, Odoo 18.0, Node.js, rtlcss, wkhtmltopdf, systemd service",
+    "info": "Required parameter: domain name"
   }
 ]
