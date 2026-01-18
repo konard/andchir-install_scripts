@@ -54,13 +54,14 @@ VENV_DIR=""
 #-------------------------------------------------------------------------------
 
 show_usage() {
-    echo "Usage: $0 <domain_name>"
+    echo "Usage: $0 <api_domain> <client_domain>"
     echo ""
     echo "Arguments:"
-    echo "  domain_name    The domain name for the application (e.g., api.example.com)"
+    echo "  api_domain       The domain name for the API application (e.g., api.example.com)"
+    echo "  client_domain    The domain name of the client that will use this API (e.g., example.com)"
     echo ""
     echo "Example:"
-    echo "  $0 api.example.com"
+    echo "  $0 api.example.com example.com"
     echo ""
     echo "Note: This script must be run as root or with sudo."
     exit 1
@@ -117,7 +118,7 @@ generate_secret_key() {
 check_root() {
     if [[ $EUID -ne 0 ]]; then
         print_error "This script must be run as root!"
-        print_info "Run with: sudo $0 <domain_name>"
+        print_info "Run with: sudo $0 <api_domain> <client_domain>"
         exit 1
     fi
 }
@@ -179,17 +180,21 @@ show_banner() {
 }
 
 parse_arguments() {
-    # Check if domain name argument is provided
-    if [[ $# -lt 1 ]] || [[ -z "$1" ]]; then
-        print_error "Domain name is required!"
+    # Check if both domain arguments are provided
+    if [[ $# -lt 2 ]] || [[ -z "$1" ]] || [[ -z "$2" ]]; then
+        print_error "Both API domain and client domain are required!"
         show_usage
     fi
 
     DOMAIN_NAME="$1"
+    CLIENT_DOMAIN="$2"
+
     validate_domain "$DOMAIN_NAME"
+    validate_domain "$CLIENT_DOMAIN"
 
     print_header "Domain Configuration"
-    print_success "Domain configured: $DOMAIN_NAME"
+    print_success "API domain configured: $DOMAIN_NAME"
+    print_success "Client domain configured: $CLIENT_DOMAIN"
 }
 
 install_dependencies() {
@@ -378,7 +383,7 @@ EMAIL_HOST_PASSWORD=
 EMAIL_USE_TLS=False
 EMAIL_USE_SSL=True
 ALLOWED_HOSTS=127.0.0.1,localhost,$DOMAIN_NAME
-CORS_ALLOWED_ORIGINS=http://localhost,http://localhost:4200,http://localhost:8000,http://api2app.loc,http://api2app.org,https://api2app.org,http://api.api2app.ru,https://api.api2app.ru,http://api2.api2app.org,https://api2.api2app.org
+CORS_ALLOWED_ORIGINS=http://localhost,http://localhost:4200,http://localhost:8000,http://$CLIENT_DOMAIN,https://$CLIENT_DOMAIN
 ADMIN_LOG_OWNER_SECTION_NAME=Log owners
 SECRET_KEY=$DJANGO_SECRET_KEY
 EOF
@@ -686,7 +691,8 @@ main() {
 
     echo ""
     print_info "Starting installation. This may take several minutes..."
-    print_info "Domain: $DOMAIN_NAME"
+    print_info "API Domain: $DOMAIN_NAME"
+    print_info "Client Domain: $CLIENT_DOMAIN"
     print_info "User: $CURRENT_USER"
     echo ""
 
