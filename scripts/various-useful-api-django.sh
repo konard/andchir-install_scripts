@@ -378,6 +378,7 @@ EMAIL_HOST_PASSWORD=
 EMAIL_USE_TLS=False
 EMAIL_USE_SSL=True
 ALLOWED_HOSTS=127.0.0.1,localhost,$DOMAIN_NAME
+CORS_ALLOWED_ORIGINS=http://localhost,http://localhost:4200,http://localhost:8000,http://api2app.loc,http://api2app.org,https://api2app.org,http://api.api2app.ru,https://api.api2app.ru,http://api2.api2app.org,https://api2.api2app.org
 ADMIN_LOG_OWNER_SECTION_NAME=Log owners
 SECRET_KEY=$DJANGO_SECRET_KEY
 EOF
